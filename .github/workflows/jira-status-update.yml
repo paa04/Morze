@@ -8,6 +8,7 @@ on:
     types: [opened, reopened, synchronize, converted_to_draft, ready_for_review, closed]
     branches:
       - develop         # только PR, которые вливаются в develop
+  workflow_dispatch:
 
 jobs:
   jira:
