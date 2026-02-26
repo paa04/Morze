@@ -13,28 +13,28 @@ jobs:
   jira-transition:
     runs-on: ubuntu-latest
 
-		steps:
-			- name: Extract Jira issue key from branch name
-		    id: extract
-		    run: |
-		      if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-		        BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
-		      else
-		        BRANCH_NAME="${{ github.ref_name }}"
-		      fi
+    steps:
+      - name: Extract Jira issue key from branch name
+        id: extract
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          else
+            BRANCH_NAME="${{ github.ref_name }}"
+          fi
 
-		      echo "Branch: $BRANCH_NAME"
+          echo "Branch: $BRANCH_NAME"
 
-		      ISSUE_KEY=$(echo "$BRANCH_NAME" | grep -oE '[A-Z]+-[0-9]+' | head -1)
-		      echo "issue=$ISSUE_KEY" >> $GITHUB_OUTPUT
+          ISSUE_KEY=$(echo "$BRANCH_NAME" | grep -oE '[A-Z]+-[0-9]+' | head -1)
+          echo "issue=$ISSUE_KEY" >> $GITHUB_OUTPUT
 
-		  - name: Stop if no Jira key found
-		    if: steps.extract.outputs.issue == ''
-		    run: |
-		      echo "No Jira key found in branch name"
-		      exit 0
+      - name: Stop if no Jira key found
+        if: steps.extract.outputs.issue == ''
+        run: |
+          echo "No Jira key found in branch name"
+          exit 0
 
-      - name: Move to In Progress on first commit
+      - name: Move to In Progress on push
         if: github.event_name == 'push'
         run: |
           curl -X POST \
