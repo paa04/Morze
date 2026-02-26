@@ -1,0 +1,55 @@
+@startuml
+top to bottom direction
+skinparam packageStyle rectangle
+
+actor "Пользователь" as User
+
+rectangle "P2P Мессенджер" {
+
+  package "Личный чат" {
+    (Создать личный чат) as UC1
+    (Посмотреть историю сообщений) as UC2
+    package "Можно сделать"{
+    (Редактировать сообщение) as UC3
+    (Удалить сообщение) as UC4
+    }
+    (Отправить сообщение) as UC5
+  }
+
+  package "Групповой чат" {
+    (Создать группу) as UC9
+    (Пригласить участника) as UC10
+    (Посмотреть информацию о группе) as UC11
+    (Написать в группу) as UC13
+    (Выйти из группы) as UC15
+  }
+
+  package "Аккаунт" {
+    (Задать логин) as UC17
+    (Сменить настройки приложения) as UC12
+  }
+}
+
+' --- Связи пользователя ---
+User --> UC1
+User --> UC2
+User --> UC3
+User --> UC4
+User --> UC5
+
+User --> UC9
+User --> UC10
+User --> UC11
+User --> UC13
+User --> UC15
+User --> UC12
+
+User --> UC17
+
+
+
+' --- include ---
+UC10 ..> UC5
+UC1 ..> UC5
+
+@enduml
