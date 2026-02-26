@@ -13,6 +13,10 @@ jobs:
   jira:
     runs-on: ubuntu-latest
     steps:
+      # 1. Обязательно клонируем репозиторий, чтобы gh работал
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Login to Jira
         uses: atlassian/gajira-login@v3
         env:
