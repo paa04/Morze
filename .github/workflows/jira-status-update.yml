@@ -54,7 +54,8 @@ jobs:
         uses: atlassian/gajira-transition@v3
         with:
           issue: ${{ steps.find.outputs.issue }}
-          transition: 21   # название перехода в Jira (см. настройку)
+          transition:   # название перехода в Jira (см. настройку)
+          	id: 21
 
       # 2. PR открыт (opened/reopened) → In Progress → Review
       - name: Transition to Review (PR opened/reopened)
@@ -62,7 +63,8 @@ jobs:
         uses: atlassian/gajira-transition@v3
         with:
           issue: ${{ steps.find.outputs.issue }}
-          transition: 31
+          transition: 
+          	id: 31
 
       # 3. PR переведён в черновик (draft) → Review → In Progress
       - name: Transition back to In Progress (PR converted to draft)
@@ -70,7 +72,8 @@ jobs:
         uses: atlassian/gajira-transition@v3
         with:
           issue: ${{ steps.find.outputs.issue }}
-          transition: 21   # или отдельный переход "Back to In Progress"
+          transition: 
+          	id: 21   # или отдельный переход "Back to In Progress"
 
       # 4. PR готов к ревью (из черновика) → In Progress → Review
       - name: Transition to Review (PR ready for review)
@@ -78,7 +81,8 @@ jobs:
         uses: atlassian/gajira-transition@v3
         with:
           issue: ${{ steps.find.outputs.issue }}
-          transition: 31
+          transition: 
+          	id: 31
 
       # 5. PR влит (merged) в develop → Review → Done
       - name: Transition to Done (PR merged)
@@ -86,4 +90,5 @@ jobs:
         uses: atlassian/gajira-transition@v3
         with:
           issue: ${{ steps.find.outputs.issue }}
-          transition: 41
+          transition: 
+          	id: 41
