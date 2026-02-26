@@ -10,85 +10,58 @@ on:
       - develop         # только PR, которые вливаются в develop
 
 jobs:
-  jira:
+  jira-transition:
     runs-on: ubuntu-latest
+
     steps:
-      # 1. Обязательно клонируем репозиторий, чтобы gh работал
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Login to Jira
-        uses: atlassian/gajira-login@v3
-        env:
-          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
-          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
-          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-
-      - name: Find issue key
-        id: find
-        uses: atlassian/gajira-find-issue-key@v3
-        with:
-          from: branch   # ищем ключ задачи в имени ветки (например, PROJ-123)
-
-      - name: Check if issue found
-        if: steps.find.outputs.issue == ''
-        run: echo "No issue key found in branch name, skipping" && exit 0
-
-      # Для push-событий проверяем, есть ли уже открытый PR из этой ветки
-      - name: Check for open PR (push only)
-        id: pr_check
-        if: github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Extract Jira issue key
+        id: extract
         run: |
-          PR_INFO=$(gh pr list --head "${{ github.ref_name }}" --state open --json url --jq '.[0].url')
-          if [ -n "$PR_INFO" ]; then
-            echo "has_pr=true" >> $GITHUB_OUTPUT
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            MESSAGE=$(git log -1 --pretty=%B)
           else
-            echo "has_pr=false" >> $GITHUB_OUTPUT
+            MESSAGE="${{ github.event.pull_request.title }}"
           fi
 
-      # 1. Первый коммит в ветке (нет открытого PR) → переводим To Do → In Progress
-      - name: Transition to In Progress (on push, no open PR)
-        if: github.event_name == 'push' && steps.pr_check.outputs.has_pr == 'false'
-        uses: atlassian/gajira-transition@v3
-        with:
-          issue: ${{ steps.find.outputs.issue }}
-          transition:   # название перехода в Jira (см. настройку)
-          	id: 21
+          ISSUE_KEY=$(echo "$MESSAGE" | grep -oE '[A-Z]+-[0-9]+' | head -1)
+          echo "issue=$ISSUE_KEY" >> $GITHUB_OUTPUT
 
-      # 2. PR открыт (opened/reopened) → In Progress → Review
-      - name: Transition to Review (PR opened/reopened)
-        if: github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'reopened')
-        uses: atlassian/gajira-transition@v3
-        with:
-          issue: ${{ steps.find.outputs.issue }}
-          transition: 
-          	id: 31
+      - name: Stop if no Jira key
+        if: steps.extract.outputs.issue == ''
+        run: exit 0
 
-      # 3. PR переведён в черновик (draft) → Review → In Progress
-      - name: Transition back to In Progress (PR converted to draft)
-        if: github.event_name == 'pull_request' && github.event.action == 'converted_to_draft'
-        uses: atlassian/gajira-transition@v3
-        with:
-          issue: ${{ steps.find.outputs.issue }}
-          transition: 
-          	id: 21   # или отдельный переход "Back to In Progress"
+      - name: Move to In Progress on first commit
+        if: github.event_name == 'push'
+        run: |
+          curl -X POST \
+            -u ${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
+            -H "Content-Type: application/json" \
+            --data '{"transition": {"id": "21"}}' \
+            ${{ secrets.JIRA_BASE_URL }}/rest/api/3/issue/${{ steps.extract.outputs.issue }}/transitions
 
-      # 4. PR готов к ревью (из черновика) → In Progress → Review
-      - name: Transition to Review (PR ready for review)
-        if: github.event_name == 'pull_request' && github.event.action == 'ready_for_review'
-        uses: atlassian/gajira-transition@v3
-        with:
-          issue: ${{ steps.find.outputs.issue }}
-          transition: 
-          	id: 31
+      - name: Move to In Review on PR open
+        if: github.event.action == 'opened' || github.event.action == 'ready_for_review'
+        run: |
+          curl -X POST \
+            -u ${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
+            -H "Content-Type: application/json" \
+            --data '{"transition": {"id": "31"}}' \
+            ${{ secrets.JIRA_BASE_URL }}/rest/api/3/issue/${{ steps.extract.outputs.issue }}/transitions
 
-      # 5. PR влит (merged) в develop → Review → Done
-      - name: Transition to Done (PR merged)
-        if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
-        uses: atlassian/gajira-transition@v3
-        with:
-          issue: ${{ steps.find.outputs.issue }}
-          transition: 
-          	id: 41
+      - name: Move back to In Progress on Draft
+        if: github.event.action == 'converted_to_draft'
+        run: |
+          curl -X POST \
+            -u ${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
+            -H "Content-Type: application/json" \
+            --data '{"transition": {"id": "21"}}' \
+            ${{ secrets.JIRA_BASE_URL }}/rest/api/3/issue/${{ steps.extract.outputs.issue }}/transitions
+
+      - name: Move to Done on Merge
+        if: github.event.pull_request.merged == true
+        run: |
+          curl -X POST \
+            -u ${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
+            -H "Content-Type: application/json" \
+            --data '{"transition": {"id": "41"}}' \
+            ${{ secrets.JIRA_BASE_URL }}/rest/api/3/issue/${{ steps.extract.outputs.issue }}/transitions
