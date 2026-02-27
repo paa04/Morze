@@ -37,35 +37,39 @@ jobs:
       - name: Move to In Progress on push
         if: github.event_name == 'push'
         run: |
-          curl -X POST \
+          curl \
             -u ${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
             -H "Content-Type: application/json" \
+            -X POST \
             --data '{"transition": {"id": "21"}}' \
             ${{ secrets.JIRA_BASE_URL }}/rest/api/3/issue/${{ steps.extract.outputs.issue }}/transitions
 
       - name: Move to In Review on PR open
         if: github.event.action == 'opened' || github.event.action == 'ready_for_review'
         run: |
-          curl -X POST \
+          curl \
             -u ${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
             -H "Content-Type: application/json" \
+            -X POST \
             --data '{"transition": {"id": "31"}}' \
             ${{ secrets.JIRA_BASE_URL }}/rest/api/3/issue/${{ steps.extract.outputs.issue }}/transitions
 
       - name: Move back to In Progress on Draft
         if: github.event.action == 'converted_to_draft'
         run: |
-          curl -X POST \
+          curl \
             -u ${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
             -H "Content-Type: application/json" \
+            -X POST \
             --data '{"transition": {"id": "21"}}' \
             ${{ secrets.JIRA_BASE_URL }}/rest/api/3/issue/${{ steps.extract.outputs.issue }}/transitions
 
       - name: Move to Done on Merge
         if: github.event.pull_request.merged == true
         run: |
-          curl -X POST \
+          curl \
             -u ${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
             -H "Content-Type: application/json" \
+            -X POST \
             --data '{"transition": {"id": "41"}}' \
             ${{ secrets.JIRA_BASE_URL }}/rest/api/3/issue/${{ steps.extract.outputs.issue }}/transitions
