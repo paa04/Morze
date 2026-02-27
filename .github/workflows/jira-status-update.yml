@@ -45,7 +45,7 @@ jobs:
             ${{ secrets.JIRA_BASE_URL }}/rest/api/3/issue/${{ steps.extract.outputs.issue }}/transitions
 
       - name: Move to In Review on PR open
-        if: github.event.action == 'opened' || github.event.action == 'ready_for_review'
+        if: github.event.action == 'opened' || github.event.action == 'ready_for_review' || github.event.action == 'reopened'
         run: |
           curl \
             -u ${{ secrets.JIRA_USER_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
