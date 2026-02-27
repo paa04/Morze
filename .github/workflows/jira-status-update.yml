@@ -38,7 +38,7 @@ jobs:
         if: github.event_name == 'push'
         run: |
           curl \
-            -u ${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
+            -u ${{ secrets.JIRA_USER_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
             -H "Content-Type: application/json" \
             -X POST \
             --data '{"transition": {"id": "21"}}' \
@@ -48,7 +48,7 @@ jobs:
         if: github.event.action == 'opened' || github.event.action == 'ready_for_review'
         run: |
           curl \
-            -u ${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
+            -u ${{ secrets.JIRA_USER_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
             -H "Content-Type: application/json" \
             -X POST \
             --data '{"transition": {"id": "31"}}' \
@@ -58,7 +58,7 @@ jobs:
         if: github.event.action == 'converted_to_draft'
         run: |
           curl \
-            -u ${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
+            -u ${{ secrets.JIRA_USER_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
             -H "Content-Type: application/json" \
             -X POST \
             --data '{"transition": {"id": "21"}}' \
@@ -68,7 +68,7 @@ jobs:
         if: github.event.pull_request.merged == true
         run: |
           curl \
-            -u ${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
+            -u ${{ secrets.JIRA_USER_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
             -H "Content-Type: application/json" \
             -X POST \
             --data '{"transition": {"id": "41"}}' \
