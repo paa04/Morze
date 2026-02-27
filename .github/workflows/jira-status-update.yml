@@ -55,7 +55,7 @@ jobs:
             ${{ secrets.JIRA_BASE_URL }}/rest/api/3/issue/${{ steps.extract.outputs.issue }}/transitions
 
       - name: Move back to In Progress on Draft
-        if: github.event.action == 'converted_to_draft'
+        if: github.event.action == 'converted_to_draft' || github.event.action == 'closed'
         run: |
           curl \
             -u ${{ secrets.JIRA_USER_EMAIL }}:${{ secrets.JIRA_API_TOKEN }} \
