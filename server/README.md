@@ -1,21 +1,25 @@
-# C++ signaling server (MVP skeleton)
+# C++ signaling server (Boost.Beast MVP)
 
-Скелет сигналинг-сервера для MVP из `server/tz.md`.
+Сигналинг-сервер для MVP из `server/tz.md` на современных готовых компонентах:
 
-## Что реализовано
+- `Boost.Asio` для асинхронной event-loop модели
+- `Boost.Beast` для WebSocket сервера
+- `Boost.JSON` для разбора и сериализации сообщений
 
-- WebSocket-сервер (без внешних библиотек).
-- In-memory состояние комнат и peer sessions.
-- Поддержка сообщений:
-  - `join` (`room`, `id`)
-  - `signal` (`to`, `data`)
-- Серверные события:
-  - `peers`
-  - `peer-joined`
-  - `peer-left`
-  - `signal`
-  - `error`
-- Удаление комнаты после выхода последнего участника.
+## Поддерживаемый протокол
+
+Клиентские сообщения:
+
+- `join` (`room`, `id`)
+- `signal` (`to`, `data`)
+
+Серверные сообщения:
+
+- `peers`
+- `peer-joined`
+- `peer-left`
+- `signal`
+- `error`
 
 ## Сборка
 
@@ -33,11 +37,20 @@ cmake --build build -j
 PORT=9001 ./build/signaling_server
 # или
 ./build/signaling_server 9001
+# или (port + worker threads)
+./build/signaling_server 9001 4
+# или
+PORT=9001 THREADS=4 ./build/signaling_server
 ```
 
-## Ограничения скелета
+## Тесты
 
-- Нет аутентификации и персистентного хранилища.
-- Нет TLS.
-- JSON-разбор минимальный и ориентирован на MVP-схему сообщений.
-- Однопоточная event-loop модель.
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+## Что важно
+
+- Сервер не хранит историю сообщений (только in-memory состояние комнат/peer sessions).
+- При выходе последнего участника комната удаляется.
+- Это signaling-only сервер: пользовательские сообщения через него не пересылаются.

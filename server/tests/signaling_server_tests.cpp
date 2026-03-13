@@ -1,100 +1,87 @@
 #include "signaling_server.hpp"
 
+#include <boost/json.hpp>
 #include <gtest/gtest.h>
 
-#include <array>
 #include <string>
 
 namespace {
 
-std::string makeMaskedTextFrame(const std::string& text) {
-  std::string frame;
-  frame.push_back(static_cast<char>(0x81));
-  frame.push_back(static_cast<char>(0x80 | static_cast<uint8_t>(text.size())));
+namespace json = boost::json;
 
-  constexpr std::array<uint8_t, 4> mask = {0x11, 0x22, 0x33, 0x44};
-  frame.append(reinterpret_cast<const char*>(mask.data()), mask.size());
+TEST(ProtocolTest, ParseObjectAcceptsJsonObject) {
+  std::string error;
+  auto obj = signaling::protocol::parseObject(R"({"type":"join","room":"r1","id":"p1"})", error);
 
-  for (size_t i = 0; i < text.size(); ++i) {
-    frame.push_back(static_cast<char>(static_cast<uint8_t>(text[i]) ^ mask[i % mask.size()]));
-  }
+  ASSERT_TRUE(obj.has_value());
+  EXPECT_TRUE(error.empty());
 
-  return frame;
-}
-
-TEST(ProtocolTest, WebSocketAcceptMatchesRfcVector) {
-  const std::string key = "dGhlIHNhbXBsZSBub25jZQ==";
-  const std::string expected = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=";
-  EXPECT_EQ(signaling::protocol::wsAcceptValue(key), expected);
-}
-
-TEST(ProtocolTest, JsonFieldParsingWorksForStringAndRawObject) {
-  const std::string payload =
-      R"({"type":"signal","to":"peer-1","data":{"sdp":"offer","arr":[1,2,3]}})";
-
-  auto type = signaling::protocol::getJsonStringField(payload, "type");
-  auto to = signaling::protocol::getJsonStringField(payload, "to");
-  auto rawData = signaling::protocol::getJsonRawValue(payload, "data");
-
+  auto type = signaling::protocol::getStringField(*obj, "type");
   ASSERT_TRUE(type.has_value());
-  ASSERT_TRUE(to.has_value());
-  ASSERT_TRUE(rawData.has_value());
-
-  EXPECT_EQ(*type, "signal");
-  EXPECT_EQ(*to, "peer-1");
-  EXPECT_NE(rawData->find("\"sdp\":\"offer\""), std::string::npos);
-  EXPECT_NE(rawData->find("\"arr\":[1,2,3]"), std::string::npos);
+  EXPECT_EQ(*type, "join");
 }
 
-TEST(ProtocolTest, JsonEscapeEscapesControlAndQuotes) {
-  const std::string input = "line\n\"quoted\"\\slash";
-  const std::string escaped = signaling::protocol::jsonEscape(input);
+TEST(ProtocolTest, ParseObjectRejectsInvalidJson) {
+  std::string error;
+  auto obj = signaling::protocol::parseObject("{bad json}", error);
 
-  EXPECT_EQ(escaped, "line\\n\\\"quoted\\\"\\\\slash");
+  EXPECT_FALSE(obj.has_value());
+  EXPECT_FALSE(error.empty());
 }
 
-TEST(ProtocolTest, DecodeClientFrameReturnsPayload) {
-  std::string buffer = makeMaskedTextFrame("hello");
-  std::string payload;
-  uint8_t opcode = 0;
-  bool isClose = false;
+TEST(ProtocolTest, ParseObjectRejectsNonObjectRoot) {
+  std::string error;
+  auto obj = signaling::protocol::parseObject(R"([1,2,3])", error);
 
-  const bool ok = signaling::protocol::decodeClientFrame(buffer, payload, opcode, isClose);
-
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(opcode, 0x01);
-  EXPECT_FALSE(isClose);
-  EXPECT_EQ(payload, "hello");
-  EXPECT_TRUE(buffer.empty());
+  EXPECT_FALSE(obj.has_value());
+  EXPECT_EQ(error, "json payload must be an object");
 }
 
-TEST(ProtocolTest, DecodeClientFrameRejectsUnmaskedClientData) {
-  std::string buffer;
-  buffer.push_back(static_cast<char>(0x81));
-  buffer.push_back(static_cast<char>(0x02));
-  buffer += "hi";
+TEST(ProtocolTest, GetStringFieldReturnsNulloptForMissingOrWrongType) {
+  json::object obj;
+  obj["name"] = "alice";
+  obj["num"] = 42;
 
-  std::string payload;
-  uint8_t opcode = 0;
-  bool isClose = false;
+  auto name = signaling::protocol::getStringField(obj, "name");
+  auto missing = signaling::protocol::getStringField(obj, "missing");
+  auto wrong = signaling::protocol::getStringField(obj, "num");
 
-  EXPECT_FALSE(signaling::protocol::decodeClientFrame(buffer, payload, opcode, isClose));
+  ASSERT_TRUE(name.has_value());
+  EXPECT_EQ(*name, "alice");
+  EXPECT_FALSE(missing.has_value());
+  EXPECT_FALSE(wrong.has_value());
 }
 
-TEST(ProtocolTest, DecodeClientFrameHandlesIncompleteBuffer) {
-  std::string buffer;
-  buffer.push_back(static_cast<char>(0x81));
+TEST(ProtocolTest, MessageBuildersProduceExpectedShape) {
+  auto err = signaling::protocol::makeError("boom");
+  EXPECT_EQ(err.at("type").as_string(), "error");
+  EXPECT_EQ(err.at("message").as_string(), "boom");
 
-  std::string payload;
-  uint8_t opcode = 99;
-  bool isClose = true;
+  auto peers = signaling::protocol::makePeers({"a", "b"});
+  EXPECT_EQ(peers.at("type").as_string(), "peers");
+  ASSERT_TRUE(peers.at("peers").is_array());
+  EXPECT_EQ(peers.at("peers").as_array().size(), 2U);
 
-  const bool ok = signaling::protocol::decodeClientFrame(buffer, payload, opcode, isClose);
+  auto joined = signaling::protocol::makePeerJoined("new-peer");
+  EXPECT_EQ(joined.at("type").as_string(), "peer-joined");
+  EXPECT_EQ(joined.at("id").as_string(), "new-peer");
 
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(opcode, 0x00);
-  EXPECT_FALSE(isClose);
-  EXPECT_TRUE(payload.empty());
+  auto left = signaling::protocol::makePeerLeft("old-peer");
+  EXPECT_EQ(left.at("type").as_string(), "peer-left");
+  EXPECT_EQ(left.at("id").as_string(), "old-peer");
+}
+
+TEST(ProtocolTest, MakeSignalForwardPreservesDataValue) {
+  json::object data;
+  data["sdp"] = "offer";
+  data["candidate"] = "cand-1";
+
+  auto signal = signaling::protocol::makeSignalForward("peer-x", data);
+
+  EXPECT_EQ(signal.at("type").as_string(), "signal");
+  EXPECT_EQ(signal.at("from").as_string(), "peer-x");
+  ASSERT_TRUE(signal.at("data").is_object());
+  EXPECT_EQ(signal.at("data").as_object().at("sdp").as_string(), "offer");
 }
 
 } // namespace
