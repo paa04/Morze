@@ -11,7 +11,8 @@ namespace json = boost::json;
 
 TEST(ProtocolTest, ParseObjectAcceptsJsonObject) {
   std::string error;
-  auto obj = signaling::protocol::parseObject(R"({"type":"join","room":"r1","id":"p1"})", error);
+  auto obj = signaling::protocol::parseObject(
+      R"({"type":"join","room":"r1","id":"p1","room_type":"direct"})", error);
 
   ASSERT_TRUE(obj.has_value());
   EXPECT_TRUE(error.empty());
@@ -69,6 +70,11 @@ TEST(ProtocolTest, MessageBuildersProduceExpectedShape) {
   auto left = signaling::protocol::makePeerLeft("old-peer");
   EXPECT_EQ(left.at("type").as_string(), "peer-left");
   EXPECT_EQ(left.at("id").as_string(), "old-peer");
+
+  auto relay = signaling::protocol::makeRelayForward("from-1", json::value("payload"));
+  EXPECT_EQ(relay.at("type").as_string(), "relay");
+  EXPECT_EQ(relay.at("from").as_string(), "from-1");
+  EXPECT_EQ(relay.at("data").as_string(), "payload");
 }
 
 TEST(ProtocolTest, MakeSignalForwardPreservesDataValue) {

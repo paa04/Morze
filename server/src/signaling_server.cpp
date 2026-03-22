@@ -89,12 +89,25 @@ json::object makeSignalForward(std::string_view fromPeerId, const json::value& d
   return out;
 }
 
+json::object makeRelayForward(std::string_view fromPeerId, const json::value& data) {
+  json::object out;
+  out["type"] = "relay";
+  out["from"] = fromPeerId;
+  out["data"] = data;
+  return out;
+}
+
 } // namespace protocol
 
 class Session;
 
 class RoomRegistry {
 public:
+  enum class RoomType {
+    Direct,
+    Group,
+  };
+
   struct JoinResult {
     bool ok{false};
     std::string error;
@@ -107,23 +120,36 @@ public:
     std::string fromPeerId;
   };
 
+  struct RelayRoute {
+    std::string fromPeerId;
+    std::vector<std::shared_ptr<Session>> targets;
+  };
+
   struct LeaveResult {
     bool hadMembership{false};
     std::string peerId;
     std::vector<std::shared_ptr<Session>> peersToNotify;
   };
 
-  JoinResult join(const std::shared_ptr<Session>& session, std::string roomId, std::string peerId);
-  std::optional<SignalRoute> route(const std::shared_ptr<Session>& sender, const std::string& toPeerId);
+  JoinResult join(const std::shared_ptr<Session>& session,
+                  std::string roomId,
+                  std::string peerId,
+                  RoomType roomType);
+  std::optional<SignalRoute> route(const std::shared_ptr<Session>& sender,
+                                   const std::string& toPeerId,
+                                   std::string& error);
+  std::optional<RelayRoute> relayTargets(const std::shared_ptr<Session>& sender);
   LeaveResult leave(const std::shared_ptr<Session>& session);
 
 private:
   struct ClientInfo {
     std::string roomId;
     std::string peerId;
+    RoomType roomType{RoomType::Direct};
   };
 
   struct RoomInfo {
+    RoomType roomType{RoomType::Direct};
     std::unordered_map<std::string, std::weak_ptr<Session>> members;
   };
 
@@ -231,19 +257,37 @@ private:
       return;
     }
 
+    if (*type == "relay") {
+      handleRelay(*parsed);
+      return;
+    }
+
     sendJson(protocol::makeError("unsupported message type"));
   }
 
   void handleJoin(const json::object& msg) {
     const auto room = protocol::getStringField(msg, "room");
     const auto id = protocol::getStringField(msg, "id");
+    const auto roomTypeRaw = protocol::getStringField(msg, "room_type");
 
-    if (!room.has_value() || !id.has_value()) {
-      sendJson(protocol::makeError("join requires string fields: room, id"));
+    if (!room.has_value() || !id.has_value() || !roomTypeRaw.has_value()) {
+      sendJson(protocol::makeError("join requires string fields: room, id, room_type"));
       return;
     }
 
-    auto result = registry_->join(shared_from_this(), *room, *id);
+    std::optional<RoomRegistry::RoomType> roomType;
+    if (*roomTypeRaw == "direct") {
+      roomType = RoomRegistry::RoomType::Direct;
+    } else if (*roomTypeRaw == "group") {
+      roomType = RoomRegistry::RoomType::Group;
+    }
+
+    if (!roomType.has_value()) {
+      sendJson(protocol::makeError("room_type must be 'direct' or 'group'"));
+      return;
+    }
+
+    auto result = registry_->join(shared_from_this(), *room, *id, *roomType);
     if (!result.ok) {
       sendJson(protocol::makeError(result.error));
       return;
@@ -265,13 +309,33 @@ private:
       return;
     }
 
-    auto route = registry_->route(shared_from_this(), *to);
+    std::string routeError;
+    auto route = registry_->route(shared_from_this(), *to, routeError);
     if (!route.has_value()) {
-      sendJson(protocol::makeError("target peer not found"));
+      sendJson(protocol::makeError(routeError));
       return;
     }
 
     route->target->sendJson(protocol::makeSignalForward(route->fromPeerId, dataIt->value()));
+  }
+
+  void handleRelay(const json::object& msg) {
+    auto dataIt = msg.find("data");
+    if (dataIt == msg.end()) {
+      sendJson(protocol::makeError("relay requires field: data(any)"));
+      return;
+    }
+
+    auto route = registry_->relayTargets(shared_from_this());
+    if (!route.has_value()) {
+      sendJson(protocol::makeError("relay is allowed only in group rooms"));
+      return;
+    }
+
+    auto relayMsg = protocol::makeRelayForward(route->fromPeerId, dataIt->value());
+    for (const auto& target : route->targets) {
+      target->sendJson(relayMsg);
+    }
   }
 
   void cleanup() {
@@ -300,7 +364,8 @@ private:
 
 RoomRegistry::JoinResult RoomRegistry::join(const std::shared_ptr<Session>& session,
                                             std::string roomId,
-                                            std::string peerId) {
+                                            std::string peerId,
+                                            RoomType roomType) {
   std::lock_guard<std::mutex> lock(mu_);
 
   JoinResult out;
@@ -315,6 +380,19 @@ RoomRegistry::JoinResult RoomRegistry::join(const std::shared_ptr<Session>& sess
   }
 
   auto& room = rooms_[roomId];
+  for (auto it = room.members.begin(); it != room.members.end();) {
+    if (it->second.expired()) {
+      it = room.members.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  if (!room.members.empty() && room.roomType != roomType) {
+    out.error = "room type mismatch";
+    return out;
+  }
+  room.roomType = roomType;
+
   auto existing = room.members.find(peerId);
   if (existing != room.members.end()) {
     if (!existing->second.expired()) {
@@ -334,14 +412,56 @@ RoomRegistry::JoinResult RoomRegistry::join(const std::shared_ptr<Session>& sess
     }
   }
 
+  if (roomType == RoomType::Direct && out.peersToNotify.size() >= 2) {
+    out.error = "direct room supports at most 2 participants";
+    return out;
+  }
+
   room.members.emplace(peerId, session);
-  clients_.emplace(session.get(), ClientInfo{std::move(roomId), std::move(peerId)});
+  clients_.emplace(session.get(), ClientInfo{std::move(roomId), std::move(peerId), roomType});
   out.ok = true;
   return out;
 }
 
 std::optional<RoomRegistry::SignalRoute> RoomRegistry::route(const std::shared_ptr<Session>& sender,
-                                                             const std::string& toPeerId) {
+                                                             const std::string& toPeerId,
+                                                             std::string& error) {
+  std::lock_guard<std::mutex> lock(mu_);
+
+  auto senderIt = clients_.find(sender.get());
+  if (senderIt == clients_.end()) {
+    error = "join room before signaling";
+    return std::nullopt;
+  }
+
+  auto roomIt = rooms_.find(senderIt->second.roomId);
+  if (roomIt == rooms_.end()) {
+    error = "room not found";
+    return std::nullopt;
+  }
+  if (roomIt->second.roomType != RoomType::Direct) {
+    error = "signal is allowed only in direct rooms";
+    return std::nullopt;
+  }
+
+  auto targetIt = roomIt->second.members.find(toPeerId);
+  if (targetIt == roomIt->second.members.end()) {
+    error = "target peer not found";
+    return std::nullopt;
+  }
+
+  auto target = targetIt->second.lock();
+  if (!target) {
+    roomIt->second.members.erase(targetIt);
+    error = "target peer not found";
+    return std::nullopt;
+  }
+
+  return SignalRoute{std::move(target), senderIt->second.peerId};
+}
+
+std::optional<RoomRegistry::RelayRoute> RoomRegistry::relayTargets(
+    const std::shared_ptr<Session>& sender) {
   std::lock_guard<std::mutex> lock(mu_);
 
   auto senderIt = clients_.find(sender.get());
@@ -353,19 +473,28 @@ std::optional<RoomRegistry::SignalRoute> RoomRegistry::route(const std::shared_p
   if (roomIt == rooms_.end()) {
     return std::nullopt;
   }
-
-  auto targetIt = roomIt->second.members.find(toPeerId);
-  if (targetIt == roomIt->second.members.end()) {
+  if (roomIt->second.roomType != RoomType::Group) {
     return std::nullopt;
   }
 
-  auto target = targetIt->second.lock();
-  if (!target) {
-    roomIt->second.members.erase(targetIt);
-    return std::nullopt;
+  RelayRoute out;
+  out.fromPeerId = senderIt->second.peerId;
+
+  for (auto it = roomIt->second.members.begin(); it != roomIt->second.members.end();) {
+    if (it->first == senderIt->second.peerId) {
+      ++it;
+      continue;
+    }
+
+    if (auto target = it->second.lock()) {
+      out.targets.push_back(std::move(target));
+      ++it;
+    } else {
+      it = roomIt->second.members.erase(it);
+    }
   }
 
-  return SignalRoute{std::move(target), senderIt->second.peerId};
+  return out;
 }
 
 RoomRegistry::LeaveResult RoomRegistry::leave(const std::shared_ptr<Session>& session) {

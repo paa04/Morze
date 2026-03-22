@@ -10,8 +10,9 @@
 
 Клиентские сообщения:
 
-- `join` (`room`, `id`)
-- `signal` (`to`, `data`)
+- `join` (`room`, `id`, `room_type`) где `room_type` = `direct` | `group`
+- `signal` (`to`, `data`) только для `direct`-комнат
+- `relay` (`data`) только для `group`-комнат
 
 Серверные сообщения:
 
@@ -19,6 +20,7 @@
 - `peer-joined`
 - `peer-left`
 - `signal`
+- `relay`
 - `error`
 
 ## Сборка
@@ -53,4 +55,5 @@ ctest --test-dir build --output-on-failure
 
 - Сервер не хранит историю сообщений (только in-memory состояние комнат/peer sessions).
 - При выходе последнего участника комната удаляется.
-- Это signaling-only сервер: пользовательские сообщения через него не пересылаются.
+- Для `direct` комнат сервер пересылает только signaling (`signal`) между 2 участниками.
+- Для `group` комнат сервер работает как relay: пересылает `relay` всем участникам комнаты, кроме отправителя.

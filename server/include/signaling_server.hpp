@@ -21,6 +21,7 @@ boost::json::object makePeers(const std::vector<std::string>& peers);
 boost::json::object makePeerJoined(std::string_view peerId);
 boost::json::object makePeerLeft(std::string_view peerId);
 boost::json::object makeSignalForward(std::string_view fromPeerId, const boost::json::value& data);
+boost::json::object makeRelayForward(std::string_view fromPeerId, const boost::json::value& data);
 
 } // namespace protocol
 
