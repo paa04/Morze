@@ -1,29 +1,9 @@
 #pragma once
 
-#include <boost/json.hpp>
-
 #include <cstdint>
 #include <memory>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <vector>
 
 namespace signaling {
-
-namespace protocol {
-
-std::optional<boost::json::object> parseObject(std::string_view raw, std::string& error);
-std::optional<std::string> getStringField(const boost::json::object& obj, std::string_view key);
-
-boost::json::object makeError(std::string_view message);
-boost::json::object makePeers(const std::vector<std::string>& peers);
-boost::json::object makePeerJoined(std::string_view peerId);
-boost::json::object makePeerLeft(std::string_view peerId);
-boost::json::object makeSignalForward(std::string_view fromPeerId, const boost::json::value& data);
-boost::json::object makeRelayForward(std::string_view fromPeerId, const boost::json::value& data);
-
-} // namespace protocol
 
 class SignalingServer {
 public:

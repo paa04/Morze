@@ -6,21 +6,24 @@
 - `Boost.Beast` для WebSocket сервера
 - `Boost.JSON` для разбора и сериализации сообщений
 
-## Поддерживаемый протокол
+## Поддерживаемый протокол (совместим с `tz.md`)
 
 Клиентские сообщения:
 
-- `join` (`room`, `id`, `room_type`) где `room_type` = `direct` | `group`
-- `signal` (`to`, `data`) только для `direct`-комнат
-- `relay` (`data`) только для `group`-комнат
+- `join` (`roomId`, `username`, опционально `roomType`)
+- `offer` (`roomId`, `toPeerId`, `sdp`)
+- `answer` (`roomId`, `toPeerId`, `sdp`)
+- `ice-candidate` (`roomId`, `toPeerId`, `candidate`)
+- `leave` (`roomId`, `peerId`)
 
 Серверные сообщения:
 
-- `peers`
+- `joined` (`roomId`, `roomType`, `peerId`, `participants`)
 - `peer-joined`
 - `peer-left`
-- `signal`
-- `relay`
+- `offer`
+- `answer`
+- `ice-candidate`
 - `error`
 
 ## Сборка
@@ -54,6 +57,7 @@ ctest --test-dir build --output-on-failure
 ## Что важно
 
 - Сервер не хранит историю сообщений (только in-memory состояние комнат/peer sessions).
+- `peerId` генерируется сервером при `join`.
 - При выходе последнего участника комната удаляется.
-- Для `direct` комнат сервер пересылает только signaling (`signal`) между 2 участниками.
-- Для `group` комнат сервер работает как relay: пересылает `relay` всем участникам комнаты, кроме отправителя.
+- `offer`/`answer`/`ice-candidate` пересылаются только в `direct` комнатах.
+- Сервер валидирует, что `roomId` и `peerId` в `leave` соответствуют активной session.
