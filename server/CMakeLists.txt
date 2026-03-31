@@ -87,8 +87,6 @@ if (BUILD_TESTING)
   add_executable(room_registry_tests
     tests/units/room_registry_tests.cpp
     src/domain/room_registry.cpp
-          tests/e2e/clients/ws_test_client.cpp
-          tests/e2e/clients/ws_test_client.hpp
   )
 
   target_include_directories(room_registry_tests
@@ -107,9 +105,9 @@ if (BUILD_TESTING)
   gtest_discover_tests(room_registry_tests)
 
   add_executable(signaling_e2e_tests
-    tests/e2e/signaling_tests.cpp
-    tests/e2e/fixtures/signaling_e2e_fixture.cpp
-    tests/e2e/clients/ws_test_client.cpp
+          tests/e2e_signaling/signaling_tests.cpp
+          tests/e2e_signaling/fixtures/signaling_e2e_fixture.cpp
+          tests/e2e_signaling/clients/ws_test_client.cpp
     src/signaling_server.cpp
     src/domain/room_registry.cpp
     src/application/protocol.cpp
@@ -121,7 +119,7 @@ if (BUILD_TESTING)
   target_include_directories(signaling_e2e_tests
     PRIVATE
       ${CMAKE_CURRENT_SOURCE_DIR}/include
-      ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e_signaling
   )
 
   target_link_libraries(signaling_e2e_tests
@@ -137,6 +135,22 @@ if (BUILD_TESTING)
   add_test(
     NAME signaling_e2e_happy_path
     COMMAND signaling_e2e_tests --gtest_filter=TestFixture.HappyPathJoin
+
   )
   set_tests_properties(signaling_e2e_happy_path PROPERTIES LABELS e2e)
+
+  add_test(
+          NAME signaling_e2e_left_test
+          COMMAND signaling_e2e_tests --gtest_filter=TestFixture.LeaveTest
+  )
+
+  set_tests_properties(signaling_e2e_left_test PROPERTIES LABELS e2e)
+
+  add_test(
+          NAME signaling_e2e_full_pos
+          COMMAND signaling_e2e_tests --gtest_filter=TestFixture.FullPathTest
+  )
+
+  set_tests_properties(signaling_e2e_full_pos PROPERTIES LABELS e2e)
+
 endif()
