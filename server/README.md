@@ -54,6 +54,26 @@ PORT=9001 THREADS=4 ./build/signaling_server
 ctest --test-dir build --output-on-failure
 ```
 
+## PostgreSQL (каркас persistence слоя)
+
+В репозитории добавлен каркас `PostgresRoomStore` и SQL миграции:
+
+- `db/migrations/001_create_rooms.sql`
+- `db/migrations/002_create_room_members.sql`
+- `db/migrations/003_create_peer_sessions.sql`
+- `db/migrations/004_constraints.sql`
+
+По умолчанию Postgres-часть **не собирается**.
+
+Сборка с Postgres:
+
+```bash
+cmake -S . -B build -DSIGNALING_ENABLE_POSTGRES=ON
+cmake --build build -j
+```
+
+Требуется установленный `libpqxx` (`pkg-config` модуль `libpqxx`).
+
 ## Что важно
 
 - Сервер не хранит историю сообщений (только in-memory состояние комнат/peer sessions).

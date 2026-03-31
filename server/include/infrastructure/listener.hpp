@@ -10,21 +10,22 @@
 
 namespace signaling::infrastructure {
 
-class Listener : public std::enable_shared_from_this<Listener> {
-public:
-  Listener(boost::asio::io_context& ioc,
-           boost::asio::ip::tcp::endpoint endpoint,
-           std::shared_ptr<application::MessageHandler> handler);
+    class Listener : public std::enable_shared_from_this<Listener> {
+    public:
+        Listener(boost::asio::io_context &ioc,
+                 boost::asio::ip::tcp::endpoint endpoint,
+                 std::shared_ptr<application::MessageHandler> handler);
 
-  void run();
+        void run();
 
-private:
-  void doAccept();
-  void onAccept(boost::beast::error_code ec, boost::asio::ip::tcp::socket socket);
+    private:
+        void doAccept();
 
-  boost::asio::io_context& ioc_;
-  boost::asio::ip::tcp::acceptor acceptor_;
-  std::shared_ptr<application::MessageHandler> handler_;
-};
+        void onAccept(boost::beast::error_code ec, boost::asio::ip::tcp::socket socket);
+
+        boost::asio::io_context &ioc_;
+        boost::asio::ip::tcp::acceptor acceptor_;
+        std::shared_ptr<application::MessageHandler> handler_;
+    };
 
 } // namespace signaling::infrastructure

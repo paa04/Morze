@@ -5,21 +5,25 @@
 
 namespace signaling {
 
-class SignalingServer {
-public:
-  explicit SignalingServer(uint16_t port, std::size_t threads = 1);
-  ~SignalingServer();
+    class SignalingServer {
+    public:
+        explicit SignalingServer(uint16_t port, std::size_t threads = 1);
 
-  SignalingServer(const SignalingServer&) = delete;
-  SignalingServer& operator=(const SignalingServer&) = delete;
+        ~SignalingServer();
 
-  bool start();
-  void run();
-  void stop();
+        SignalingServer(const SignalingServer &) = delete;
 
-private:
-  struct Impl;
-  std::unique_ptr<Impl> impl_;
-};
+        SignalingServer &operator=(const SignalingServer &) = delete;
+
+        bool start();
+
+        void run();
+
+        void stop();
+
+    private:
+        struct Impl;
+        std::unique_ptr<Impl> impl_;
+    };
 
 } // namespace signaling

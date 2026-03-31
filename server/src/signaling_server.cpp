@@ -13,87 +13,112 @@
 #include <thread>
 #include <vector>
 
-namespace signaling {
+namespace signaling
+{
 
-namespace asio = boost::asio;
-using tcp = asio::ip::tcp;
+    namespace asio = boost::asio;
+    using tcp = asio::ip::tcp;
 
-struct SignalingServer::Impl {
-  explicit Impl(uint16_t p, std::size_t t)
-      : port(p), threads(std::max<std::size_t>(1, t)), ioc(static_cast<int>(threads)) {}
+    struct SignalingServer::Impl
+    {
+        using WorkGuard = boost::asio::executor_work_guard<boost::asio::io_context::executor_type>;
 
-  uint16_t port;
-  std::size_t threads;
-  asio::io_context ioc;
-  std::shared_ptr<domain::RoomRegistry> registry = std::make_shared<domain::RoomRegistry>();
-  std::shared_ptr<application::MessageHandler> handler =
-      std::make_shared<application::MessageHandler>(registry);
-  std::shared_ptr<infrastructure::Listener> listener;
-  std::vector<std::thread> workers;
-  std::atomic<bool> started{false};
-};
+        explicit Impl(uint16_t p, std::size_t t)
+                : port(p), threads(std::max<std::size_t>(1, t)), ioc(static_cast<int>(threads)), work_guard(boost::asio::make_work_guard(ioc))
+        {}
 
-SignalingServer::SignalingServer(uint16_t port, std::size_t threads)
-    : impl_(std::make_unique<Impl>(port, threads)) {}
+        uint16_t port;
+        std::size_t threads;
 
-SignalingServer::~SignalingServer() {
-  stop();
-}
+        asio::io_context ioc;
+        WorkGuard work_guard;
 
-bool SignalingServer::start() {
-  if (impl_->started.exchange(true)) {
-    return false;
-  }
+        std::shared_ptr<domain::RoomRegistry> registry = std::make_shared<domain::RoomRegistry>();
+        std::shared_ptr<application::MessageHandler> handler =
+                std::make_shared<application::MessageHandler>(registry);
+        std::shared_ptr<infrastructure::Listener> listener;
+        std::vector<std::thread> workers;
 
-  try {
-    impl_->listener = std::make_shared<infrastructure::Listener>(
-        impl_->ioc,
-        tcp::endpoint{tcp::v4(), impl_->port},
-        impl_->handler);
-    impl_->listener->run();
-  } catch (const std::exception& ex) {
-    std::cerr << "Failed to start signaling server: " << ex.what() << '\n';
-    impl_->started.store(false);
-    return false;
-  }
+        std::atomic<bool> started{false};
+        std::atomic<bool> running{false};
 
-  std::cout << "Signaling server started on ws://0.0.0.0:" << impl_->port << '\n';
-  return true;
-}
+    };
 
-void SignalingServer::run() {
-  if (!impl_->started.load()) {
-    return;
-  }
+    SignalingServer::SignalingServer(uint16_t port, std::size_t threads)
+            : impl_(std::make_unique<Impl>(port, threads))
+    {}
 
-  impl_->workers.reserve(impl_->threads);
-  for (std::size_t i = 0; i < impl_->threads; ++i) {
-    impl_->workers.emplace_back([this]() {
-      impl_->ioc.run();
-    });
-  }
-
-  for (auto& worker : impl_->workers) {
-    if (worker.joinable()) {
-      worker.join();
+    SignalingServer::~SignalingServer()
+    {
+        stop();
     }
-  }
-  impl_->workers.clear();
-}
 
-void SignalingServer::stop() {
-  if (!impl_->started.exchange(false)) {
-    return;
-  }
+    bool SignalingServer::start()
+    {
+        if (impl_->started.exchange(true))
+        {
+            return false;
+        }
 
-  impl_->ioc.stop();
+        try
+        {
+            impl_->listener = std::make_shared<infrastructure::Listener>(
+                    impl_->ioc,
+                    tcp::endpoint{tcp::v4(), impl_->port},
+                    impl_->handler);
+            impl_->listener->run();
+        } catch (const std::exception &ex)
+        {
+            std::cerr << "Failed to start signaling server: " << ex.what() << '\n';
+            impl_->started.store(false);
+            return false;
+        }
 
-  for (auto& worker : impl_->workers) {
-    if (worker.joinable()) {
-      worker.join();
+        std::cout << "Signaling server started on ws://0.0.0.0:" << impl_->port << '\n';
+        return true;
     }
-  }
-  impl_->workers.clear();
-}
+
+    void SignalingServer::run()
+    {
+        if (!impl_->started.load())
+        {
+            return;
+        }
+
+        if (impl_->running.exchange(true))
+        {
+            return;
+        }
+
+        impl_->workers.reserve(impl_->threads);
+        for (std::size_t i = 0; i < impl_->threads; ++i)
+        {
+            impl_->workers.emplace_back([this]()
+                                        {
+                                            impl_->ioc.run();
+                                        });
+        }
+
+        for (auto &worker: impl_->workers)
+        {
+            if (worker.joinable())
+            {
+                worker.join();
+            }
+        }
+        impl_->workers.clear();
+        impl_->running.store(false);
+    }
+
+    void SignalingServer::stop()
+    {
+        if (!impl_->started.exchange(false))
+        {
+            return;
+        }
+
+        impl_->work_guard.reset();
+        impl_->ioc.stop();
+    }
 
 } // namespace signaling
