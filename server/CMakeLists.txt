@@ -153,4 +153,26 @@ if (BUILD_TESTING)
 
   set_tests_properties(signaling_e2e_full_pos PROPERTIES LABELS e2e)
 
+  add_library(p2p_chat_e2e_clients
+    tests/e2e_p2p_chat/clients/p2p_chat_test_client.cpp
+  )
+
+  target_include_directories(p2p_chat_e2e_clients
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e_p2p_chat
+  )
+
+  target_link_directories(p2p_chat_e2e_clients
+    PRIVATE
+      /usr/local/lib
+  )
+
+  target_link_libraries(p2p_chat_e2e_clients
+    PRIVATE
+      Threads::Threads
+      datachannel
+  )
+
+  target_compile_options(p2p_chat_e2e_clients PRIVATE -Wall -Wextra -Wpedantic)
+
 endif()
