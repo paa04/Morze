@@ -6,6 +6,11 @@
 #include <rtc/peerconnection.hpp>
 #include <condition_variable>
 #include <queue>
+#include <string>
+#include <optional>
+#include <string_view>
+#include <functional>
+#include <chrono>
 
 class p2p_chat_test_client
 {
@@ -66,6 +71,15 @@ public:
 
     std::optional<std::string> wait_for_message(std::chrono::milliseconds timeout);
 
+    void create_data_channel(std::string_view label = "chat");
+
+    void set_remote_description(rtc::Description description);
+
+    void add_remote_candidate(rtc::Candidate candidate);
+
+    bool send_text(std::string_view string_view);
+
+    void close();
 
 };
 

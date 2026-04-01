@@ -175,4 +175,40 @@ if (BUILD_TESTING)
 
   target_compile_options(p2p_chat_e2e_clients PRIVATE -Wall -Wextra -Wpedantic)
 
+  add_executable(p2p_chat_e2e_tests
+    tests/e2e_p2p_chat/p2p_e2e_tests.cpp
+    tests/e2e_p2p_chat/fixture/p2p_fixture.cpp
+    tests/e2e_signaling/clients/ws_test_client.cpp
+    src/signaling_server.cpp
+    src/domain/room_registry.cpp
+    src/application/protocol.cpp
+    src/application/message_handler.cpp
+    src/infrastructure/ws_session.cpp
+    src/infrastructure/listener.cpp
+  )
+
+  target_include_directories(p2p_chat_e2e_tests
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/include
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e_p2p_chat
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e_signaling
+  )
+
+  target_link_libraries(p2p_chat_e2e_tests
+    PRIVATE
+      Boost::system
+      Boost::json
+      Threads::Threads
+      GTest::gtest_main
+      p2p_chat_e2e_clients
+  )
+
+  target_compile_options(p2p_chat_e2e_tests PRIVATE -Wall -Wextra -Wpedantic)
+
+  add_test(
+    NAME p2p_chat_e2e_happy_path
+    COMMAND p2p_chat_e2e_tests --gtest_filter=TestFixtureP2p.happy_path_full
+  )
+  set_tests_properties(p2p_chat_e2e_happy_path PROPERTIES LABELS e2e)
+
 endif()
