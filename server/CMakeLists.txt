@@ -185,6 +185,7 @@ if (BUILD_TESTING)
     src/application/message_handler.cpp
     src/infrastructure/ws_session.cpp
     src/infrastructure/listener.cpp
+          tests/e2e_p2p_chat/group_e2e_tests.cpp
   )
 
   target_include_directories(p2p_chat_e2e_tests
@@ -210,5 +211,11 @@ if (BUILD_TESTING)
     COMMAND p2p_chat_e2e_tests --gtest_filter=TestFixtureP2p.happy_path_full
   )
   set_tests_properties(p2p_chat_e2e_happy_path PROPERTIES LABELS e2e)
+
+  add_test(
+    NAME group_chat_e2e_broadcast
+    COMMAND p2p_chat_e2e_tests --gtest_filter=TestFixtureP2p.group_message_is_broadcast_to_other_members
+  )
+  set_tests_properties(group_chat_e2e_broadcast PROPERTIES LABELS e2e)
 
 endif()

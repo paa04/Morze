@@ -128,7 +128,7 @@ namespace signaling::application::protocol
     }
 
     json::object
-    protocol::makeGroupMessage(std::string_view roomId, std::string_view fromPeerId, const boost::json::value& payload)
+    makeGroupMessage(std::string_view roomId, std::string_view fromPeerId, const boost::json::value& payload)
     {
         json::object out;
         out["type"] = "group-message";
