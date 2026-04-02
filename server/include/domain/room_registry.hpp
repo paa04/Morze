@@ -49,6 +49,12 @@ struct LeaveResult {
   std::vector<std::shared_ptr<IConnection>> peersToNotify;
 };
 
+struct BroadcastResult {
+    std::vector<std::shared_ptr<IConnection>> recipients;
+    std::string fromPeerId;
+    std::string roomId;
+};
+
 class RoomRegistry {
 public:
   JoinResult join(const std::shared_ptr<IConnection>& session,
@@ -60,6 +66,10 @@ public:
                                    const std::string& roomId,
                                    const std::string& toPeerId,
                                    std::string& error);
+
+    std::optional<BroadcastResult> broadcast(const std::shared_ptr<IConnection>& sender,
+                                             const std::string& roomId,
+                                             std::string& error);
 
   LeaveResult leave(const std::shared_ptr<IConnection>& session,
                     const std::optional<std::string>& roomIdCheck,

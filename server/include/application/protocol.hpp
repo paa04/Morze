@@ -36,4 +36,8 @@ boost::json::object makeIceCandidate(std::string_view roomId,
                                      std::string_view toPeerId,
                                      const boost::json::value& candidate);
 
+boost::json::object makeGroupMessage(std::string_view roomId,
+                                     std::string_view fromPeerId,
+                                     const boost::json::value& payload);
+
 } // namespace signaling::application::protocol
