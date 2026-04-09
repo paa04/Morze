@@ -1,0 +1,77 @@
+@startuml
+title Sequence: личный чат, групповой чат, leave/reconnect
+autonumber
+
+actor "Пользователь A" as A
+actor "Пользователь B" as B
+participant "Клиент A" as CA
+participant "Клиент B" as CB
+participant "Signaling Server" as S
+participant "STUN Server" as STUN
+participant "Relay Server" as R
+
+== Личный чат (P2P через DataChannel) ==
+A -> CA: Открыть личный чат
+B -> CB: Открыть личный чат
+
+CA -> S: WebSocket connect
+CB -> S: WebSocket connect
+
+CA -> S: join(roomId, username)
+S --> CA: joined(peerIdA, participants)
+
+CB -> S: join(roomId, username)
+S --> CB: joined(peerIdB, participants)
+S --> CA: peer-joined(peerIdB, username)
+
+CA -> STUN: Запрос ICE/STUN
+CB -> STUN: Запрос ICE/STUN
+
+CA -> S: offer(fromPeerIdA, toPeerIdB, sdp)
+S --> CB: offer(...)
+CB -> S: answer(fromPeerIdB, toPeerIdA, sdp)
+S --> CA: answer(...)
+
+CA -> S: ice-candidate(...)
+S --> CB: ice-candidate(...)
+CB -> S: ice-candidate(...)
+S --> CA: ice-candidate(...)
+
+CA -> CB: DataChannel open + message
+CB --> CB: Сохранить в локальную БД
+
+== Групповой чат (через Relay Server) ==
+A -> CA: Создать/подключиться к группе
+B -> CB: Подключиться по Room ID
+
+CA -> S: join(groupRoomId, username)
+S --> CA: joined(peerIdA, roomType=group)
+CB -> S: join(groupRoomId, username)
+S --> CB: joined(peerIdB, roomType=group)
+S --> CA: peer-joined(peerIdB, username)
+
+CA -> R: connect(groupRoomId, peerIdA)
+CB -> R: connect(groupRoomId, peerIdB)
+
+CA -> R: send(groupRoomId, textMessage)
+R --> CB: broadcast(textMessage)
+CB --> CB: Сохранить в локальную БД
+
+== Выход и reconnect ==
+A -> CA: leave из комнаты
+CA -> S: leave(roomId, peerIdA)
+S --> CB: peer-left(peerIdA)
+
+CA -> S: join(roomId, username) после reconnect
+S --> CA: joined(newPeerIdA, participants)
+S --> CB: peer-joined(newPeerIdA, username)
+
+note over S
+Signaling используется только
+для установления/поддержания WebRTC.
+Пользовательские сообщения:
+- личный чат: P2P DataChannel
+- групповой чат: Relay Server
+end note
+
+@enduml
