@@ -39,3 +39,7 @@
 
 # debug information files
 *.dwo
+
+*/cmake-buid-debug/
+*/.idea/
+*.bkp
