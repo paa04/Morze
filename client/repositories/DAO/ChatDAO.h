@@ -1,54 +1,50 @@
 #ifndef MORZE_CHAT_H
 #define MORZE_CHAT_H
 
+#include <chrono>
 #include <stdexcept>
 #include <string>
+#include <boost/uuid/uuid.hpp>
 
+#include "ChatTypeConverter.h"
 #include "GlobalEnums.h"
 
 class ChatDAO {
 public:
     ChatDAO() = default; // требуется для sqlite_orm (дефолтный конструктор)
 
-    ChatDAO(std::string chat_id,
-            std::string room_id,
+    ChatDAO(boost::uuids::uuid chat_id,
+            boost::uuids::uuid room_id,
             ChatType type,
             std::string title,
-            std::string created_at) {
-        if (chat_id.empty()) throw std::invalid_argument("chat_id is required");
-        if (room_id.empty()) throw std::invalid_argument("room_id is required");
+            std::chrono::system_clock::time_point created_at) {
         if (title.empty()) throw std::invalid_argument("title is required");
 
-        if (created_at.empty()) throw std::invalid_argument("Timestamp cannot be empty");
         chat_id_ = std::move(chat_id);
         room_id_ = std::move(room_id);
         type_ = type;
         title_ = std::move(title);
-        created_at_ = std::move(created_at);
+        created_at_ = created_at;
     }
 
     // Геттеры
-    const std::string &getChatId() const { return chat_id_; }
-    const std::string &getRoomId() const { return room_id_; }
+    const boost::uuids::uuid &getChatId() const { return chat_id_; }
+    const boost::uuids::uuid &getRoomId() const { return room_id_; }
     const ChatType &getType() const { return type_; }
 
     const std::string &getTypeAsString() const {
-        if (type_ == ChatType::Direct)
-            return "direct";
-        return "group";
+        return std::move(ChatTypeConverter::toString(type_));
     }
 
     const std::string &getTitle() const { return title_; }
-    const std::string &getCreatedAt() const { return created_at_; }
+    const std::chrono::system_clock::time_point &getCreatedAt() const { return created_at_; }
 
     // Сеттеры с валидацией
-    void setChatId(std::string chat_id) {
-        if (chat_id.empty()) throw std::invalid_argument("chat_id cannot be empty");
+    void setChatId(boost::uuids::uuid chat_id) {
         chat_id_ = std::move(chat_id);
     }
 
-    void setRoomId(std::string room_id) {
-        if (room_id.empty()) throw std::invalid_argument("room_id cannot be empty");
+    void setRoomId(boost::uuids::uuid room_id) {
         room_id_ = std::move(room_id);
     }
 
@@ -56,10 +52,8 @@ public:
         type_ = type;
     }
 
-    void setTypeFromString(std::string type) {
-        if (type == "direct") type_ = ChatType::Direct;
-        else if (type == "group") type_ = ChatType::Group;
-        else throw std::invalid_argument("invalid type");
+    void setTypeFromString(const std::string &type) {
+        type_ = ChatTypeConverter::fromString(type);
     }
 
     void setTitle(std::string title) {
@@ -67,17 +61,16 @@ public:
         title_ = std::move(title);
     }
 
-    void setCreatedAt(std::string created_at) {
-        if (created_at.empty()) throw std::invalid_argument("Timestamp cannot be empty");
-        created_at_ = std::move(created_at);
+    void setCreatedAt(std::chrono::system_clock::time_point created_at) {
+        created_at_ = created_at;
     }
 
 private:
-    std::string chat_id_;
-    std::string room_id_;
+    boost::uuids::uuid chat_id_;
+    boost::uuids::uuid room_id_;
     ChatType type_;
     std::string title_;
-    std::string created_at_;
+    std::chrono::system_clock::time_point created_at_;
 };
 
 #endif //MORZE_CHAT_H

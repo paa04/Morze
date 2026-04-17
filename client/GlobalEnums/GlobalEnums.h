@@ -18,7 +18,7 @@ enum class DeliveryState {
     Failed
 };
 
-enum ChatType {
+enum class ChatType {
     Direct,
     Group
 };

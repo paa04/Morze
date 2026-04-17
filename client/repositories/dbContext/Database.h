@@ -2,6 +2,9 @@
 #define MORZE_DATABASE_H
 
 #include<memory>
+#include<sqlite_orm/sqlite_orm.h>
+
+#include<DBConfiguration.h>
 
 class Database {
 public:
@@ -15,7 +18,7 @@ public:
     auto storage() { return storage_; }
 
 private:
-    using StorageType = decltype(domain::createStorage(""));
+    using StorageType = decltype(DBConfiguration::createStorage(""));
     std::shared_ptr<StorageType> storage_;
 
     int getCurrentSchemaVersion();

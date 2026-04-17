@@ -6,7 +6,6 @@ FetchContent_Declare(
         sqlite3
         URL https://www.sqlite.org/2026/sqlite-amalgamation-3530000.zip
 )
-
 FetchContent_MakeAvailable(sqlite3)
 
 FetchContent_Declare(
@@ -14,20 +13,74 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/fnc12/sqlite_orm.git
         GIT_TAG        v1.9.1 # Или любой другой тег/коммит, который вы предпочитаете
 )
-
-include_directories(. ./*)
-
 FetchContent_MakeAvailable(sqlite_orm)
+
+FetchContent_Declare(
+        cpm
+        GIT_REPOSITORY https://github.com/cpm-cmake/CPM.cmake
+        GIT_TAG v0.42.1
+)
+FetchContent_MakeAvailable(cpm)
+
+function(add_boost_library NAME REPO TAG)
+    cmake_policy(SET CMP0169 OLD)
+    FetchContent_Declare(
+            boost_${NAME}
+            GIT_REPOSITORY ${REPO}
+            GIT_TAG ${TAG}
+            GIT_SHALLOW TRUE
+    )
+    FetchContent_GetProperties(boost_${NAME})
+    if(NOT boost_${NAME}_POPULATED)
+        FetchContent_Populate(boost_${NAME})
+    endif()
+    add_library(Boost_${NAME} INTERFACE)
+    target_include_directories(Boost_${NAME} INTERFACE ${boost_${NAME}_SOURCE_DIR}/include)
+    add_library(Boost::${NAME} ALIAS Boost_${NAME})
+endfunction()
+
+# Явно добавляем каждую необходимую библиотеку Boost
+add_boost_library(config            https://github.com/boostorg/config          boost-1.90.0)
+add_boost_library(core              https://github.com/boostorg/core            boost-1.90.0)
+add_boost_library(assert            https://github.com/boostorg/assert          boost-1.90.0)
+add_boost_library(throw_exception   https://github.com/boostorg/throw_exception boost-1.90.0)
+add_boost_library(move              https://github.com/boostorg/move            boost-1.90.0)
+add_boost_library(type_traits       https://github.com/boostorg/type_traits     boost-1.90.0)
+add_boost_library(predef            https://github.com/boostorg/predef          boost-1.90.0)
+add_boost_library(static_assert     https://github.com/boostorg/static_assert   boost-1.90.0)
+add_boost_library(winapi            https://github.com/boostorg/winapi          boost-1.90.0)
+add_boost_library(detail            https://github.com/boostorg/detail          boost-1.90.0)
+add_boost_library(system            https://github.com/boostorg/system          boost-1.90.0)
+add_boost_library(uuid              https://github.com/boostorg/uuid            boost-1.90.0)
+add_boost_library(asio              https://github.com/boostorg/asio            boost-1.90.0)
+
+# Настройки для Asio (теперь цель Boost_asio уже создана)
+target_compile_definitions(Boost_asio INTERFACE BOOST_ASIO_STANDALONE)
+target_compile_definitions(Boost_asio INTERFACE BOOST_ASIO_HAS_CO_AWAIT)
+
+
 
 set(CMAKE_CXX_STANDARD 20)
 
 add_executable(Morze main.cpp
-        repositories/migrations/Database.cpp
-        repositories/migrations/Database.h
+        repositories/dbContext/Database.cpp
+        repositories/dbContext/Database.h
         repositories/DAO/ChatDAO.h
         repositories/DAO/ChatMemberDAO.h
         repositories/DAO/MessageDAO.h
-        GlobalEnums.h
-        repositories/DAO/ConnectionProfileDAO.h)
-target_link_libraries(Morze PRIVATE sqlite_orm::sqlite_orm sqlite3)
+        GlobalEnums/GlobalEnums.h
+        repositories/DAO/ConnectionProfileDAO.h
+        repositories/DBConfiguration.h
+        GlobalEnums/MessageDirectionConverter.h
+        GlobalEnums/DeliveryStateConverter.h
+        GlobalEnums/ChatTypeConverter.h)
+target_include_directories(Morze PRIVATE
+        ./repositories/DAO
+        ./repositories
+        ./GlobalEnums)
 
+target_link_libraries(Morze PRIVATE sqlite_orm::sqlite_orm sqlite3 Boost::uuid Boost::asio)
+
+if(WIN32)
+    target_link_libraries(Morze PRIVATE ws2_32)
+endif()
