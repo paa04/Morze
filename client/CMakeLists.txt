@@ -109,7 +109,10 @@ add_executable(Morze main.cpp
         repositories/DAO/Converters/MessageDAOConverter.h
         exceptions/ChatExcpetions.h
         repositories/repositories/ChatRepository.cpp
-        repositories/repositories/ChatRepository.h)
+        repositories/repositories/ChatRepository.h
+        exceptions/ChatMemberExceptions.h
+        repositories/repositories/ChatMemberRepository.cpp
+        repositories/repositories/ChatMemberRepository.h)
 target_include_directories(Morze PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/Converters

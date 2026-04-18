@@ -66,7 +66,8 @@ TEST_CASE("ChatRepository") {
             uuid_gen(),
             ChatType::Direct,
             std::move(title),
-            std::chrono::system_clock::now()
+            std::chrono::system_clock::now(),
+            0
         );
     };
 

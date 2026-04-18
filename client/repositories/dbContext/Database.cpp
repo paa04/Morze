@@ -98,7 +98,8 @@ bool Database::runMigrations() {
                 room_id BLOB NOT NULL,
                 type TEXT NOT NULL CHECK(type IN ('direct','group')),
                 title TEXT NOT NULL,
-                created_at INTEGER NOT NULL
+                created_at INTEGER NOT NULL,
+                last_message_number INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_chats_room_id ON chats(room_id);
         )";
@@ -114,14 +115,11 @@ bool Database::runMigrations() {
             CREATE TABLE IF NOT EXISTS chat_members (
                 id BLOB PRIMARY KEY,
                 chat_id BLOB NOT NULL,
-                member_id BLOB NULL,
-                peer_id BLOB NULL,
                 username TEXT NOT NULL,
                 last_online_at INTEGER NULL,
                 FOREIGN KEY(chat_id) REFERENCES chats(chat_id) ON DELETE CASCADE
             );
             CREATE INDEX IF NOT EXISTS idx_chat_members_chat_id ON chat_members(chat_id);
-            CREATE INDEX IF NOT EXISTS idx_chat_members_member_id ON chat_members(member_id);
         )";
         if (!applyMigration(2, sql)) {
             storage_->rollback();
@@ -135,12 +133,13 @@ bool Database::runMigrations() {
             CREATE TABLE IF NOT EXISTS messages (
                 message_id BLOB PRIMARY KEY,
                 chat_id BLOB NOT NULL,
-                sender_name TEXT NOT NULL,
+                sender_id BLOB NULL,
                 direction TEXT NOT NULL CHECK(direction IN ('incoming','outgoing')),
                 content TEXT NOT NULL,
                 created_at INTEGER NOT NULL,
                 delivery_state TEXT NOT NULL,
-                FOREIGN KEY(chat_id) REFERENCES chats(chat_id) ON DELETE CASCADE
+                FOREIGN KEY(chat_id) REFERENCES chats(chat_id) ON DELETE CASCADE,
+                FOREIGN KEY(sender_id) REFERENCES chat_members(id) ON DELETE SET NULL
             );
             CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
             CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);

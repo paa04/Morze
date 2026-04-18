@@ -14,8 +14,6 @@ public:
         return ChatMemberModel{
             dao.getId(),
             dao.getChatId(),
-            dao.getMemberId(),
-            dao.getPeerId(),
             dao.getUsername(),
             dao.getLastOnlineAt()
         };
@@ -25,8 +23,6 @@ public:
         return ChatMemberDAO{
             model.getId(),
             model.getChatId(),
-            model.getMemberId(),
-            model.getPeerId(),
             model.getUsername(),
             model.getLastOnlineAt()
         };

@@ -16,7 +16,8 @@ public:
             dao.getRoomId(),
             dao.getType(),
             dao.getTitle(),
-            dao.getCreatedAt()
+            dao.getCreatedAt(),
+            dao.getLastMessageNumber()
         };
     }
 
@@ -26,7 +27,8 @@ public:
             model.getRoomId(),
             model.getType(),
             model.getTitle(),
-            model.getCreatedAt()
+            model.getCreatedAt(),
+            model.getLastMessageNumber()
         };
     }
 };

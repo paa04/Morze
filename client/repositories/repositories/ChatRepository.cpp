@@ -30,7 +30,7 @@ boost::asio::awaitable<ChatModel> ChatRepository::getChatById(const boost::uuids
         sqlite_orm::where(sqlite_orm::is_equal(&ChatDAO::getChatIdAsBLOB, blob))
     );
     if (results.empty()) {
-        throw ChatNotFoundError(std::string_view("Chat with id" +to_string(chatId)+ "not found"));
+        throw ChatNotFoundError(std::string_view("Chat with id" +UUIDConverter::toString(chatId)+ "not found"));
     }
     co_return ChatDAOConverter::convert(results.front());
 }

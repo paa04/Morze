@@ -16,15 +16,11 @@ public:
 
     ChatMemberModel(const boost::uuids::uuid id,
                   const boost::uuids::uuid chat_id,
-                  const std::optional<boost::uuids::uuid> &member_id,
-                  const std::optional<boost::uuids::uuid> &peer_id,
                   std::string username,
                   const std::optional<std::chrono::system_clock::time_point> last_online_at) {
         if (username.empty()) throw std::invalid_argument("username is required");
         id_ = id;
         chat_id_ = chat_id;
-        member_id_ = member_id;
-        peer_id_ = peer_id;
         username_ = std::move(username);
         last_online_at_ = last_online_at;
     }
@@ -37,30 +33,6 @@ public:
     const boost::uuids::uuid& getChatId() const { return chat_id_; }
     std::vector<char> getChatIdAsBLOB() const { return UUIDConverter::toBlob(chat_id_); }
     std::string getChatIdAsString() const { return UUIDConverter::toString(chat_id_); }
-
-    const std::optional<boost::uuids::uuid>& getMemberId() const { return member_id_; }
-    std::optional<std::vector<char>> getMemberIdAsBLOB() const {
-        if (member_id_.has_value())
-            return UUIDConverter::toBlob(*member_id_);
-        return std::nullopt;
-    }
-    std::optional<std::string> getMemberIdAsString() const {
-        if (member_id_.has_value())
-            return UUIDConverter::toString(*member_id_);
-        return std::nullopt;
-    }
-
-    const std::optional<boost::uuids::uuid>& getPeerId() const { return peer_id_; }
-    std::optional<std::vector<char>> getPeerIdAsBLOB() const {
-        if (peer_id_.has_value())
-            return UUIDConverter::toBlob(*peer_id_);
-        return std::nullopt;
-    }
-    std::optional<std::string> getPeerIdAsString() const {
-        if (peer_id_.has_value())
-            return UUIDConverter::toString(*peer_id_);
-        return std::nullopt;
-    }
 
     const std::string& getUsername() const { return username_; }
 
@@ -84,34 +56,6 @@ public:
     void setChatId(const boost::uuids::uuid chat_id) { chat_id_ = chat_id; }
     void setChatIdFromBLOB(const std::vector<char>& blob) { chat_id_ = UUIDConverter::fromBlob(blob); }
     void setChatIdFromString(const std::string& str) { chat_id_ = UUIDConverter::fromString(str); }
-
-    void setMemberId(const std::optional<boost::uuids::uuid> &member_id) { member_id_ = member_id; }
-    void setMemberIdFromBLOB(const std::optional<std::vector<char>>& blob) {
-        if (blob.has_value() && !blob->empty())
-            member_id_ = UUIDConverter::fromBlob(*blob);
-        else
-            member_id_ = std::nullopt;
-    }
-    void setMemberIdFromString(const std::optional<std::string>& str) {
-        if (str.has_value())
-            member_id_ = UUIDConverter::fromString(*str);
-        else
-            member_id_ = std::nullopt;
-    }
-
-    void setPeerId(const std::optional<boost::uuids::uuid> &peer_id) { peer_id_ = peer_id; }
-    void setPeerIdFromBLOB(const std::optional<std::vector<char>>& blob) {
-        if (blob.has_value() && !blob->empty())
-            peer_id_ = UUIDConverter::fromBlob(*blob);
-        else
-            peer_id_ = std::nullopt;
-    }
-    void setPeerIdFromString(const std::optional<std::string>& str) {
-        if (str.has_value())
-            peer_id_ = UUIDConverter::fromString(*str);
-        else
-            peer_id_ = std::nullopt;
-    }
 
     void setUsername(std::string username) {
         if (username.empty()) throw std::invalid_argument("username cannot be empty");
@@ -137,8 +81,6 @@ public:
 private:
     boost::uuids::uuid id_;
     boost::uuids::uuid chat_id_;
-    std::optional<boost::uuids::uuid> member_id_;
-    std::optional<boost::uuids::uuid> peer_id_;
     std::string username_;
     std::optional<std::chrono::system_clock::time_point> last_online_at_;
 };
