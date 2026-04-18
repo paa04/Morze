@@ -25,7 +25,6 @@ namespace {
     public:
         std::map<std::string, signaling::domain::RoomRecord> rooms;
         std::map<std::string, signaling::domain::RoomMemberRecord> members;
-        std::map<std::string, signaling::domain::PeerSessionRecord> sessions;
 
         void saveRoom(const signaling::domain::RoomRecord& room) override {
             rooms[room.room_id] = room;
@@ -38,7 +37,6 @@ namespace {
         void removeRoom(const std::string& roomId) override {
             for (auto it = members.begin(); it != members.end();) {
                 if (it->second.room_id == roomId) {
-                    sessions.erase(it->first);
                     it = members.erase(it);
                 } else {
                     ++it;
@@ -63,28 +61,7 @@ namespace {
             return result;
         }
         void removeMember(const std::string& memberId) override {
-            sessions.erase(memberId);
             members.erase(memberId);
-        }
-
-        void saveSession(const signaling::domain::PeerSessionRecord& session) override {
-            sessions[session.peer_id] = session;
-        }
-        void removeSession(const std::string& peerId) override {
-            sessions.erase(peerId);
-        }
-        void removeSessionsByRoom(const std::string& roomId) override {
-            for (auto it = sessions.begin(); it != sessions.end();) {
-                auto mit = members.find(it->second.member_id);
-                if (mit != members.end() && mit->second.room_id == roomId) {
-                    it = sessions.erase(it);
-                } else {
-                    ++it;
-                }
-            }
-        }
-        void clearAllSessions() override {
-            sessions.clear();
         }
 
         // Group message buffering
@@ -397,36 +374,6 @@ namespace {
 
         EXPECT_TRUE(store->findMember(j1.peerId).has_value());
         EXPECT_EQ(store->members[j1.peerId].username, "alice");
-
-        // Direct rooms don't track peer sessions
-        EXPECT_TRUE(store->sessions.empty());
-    }
-
-    TEST(RoomRegistryTest, GroupJoinCreatesPeerSession) {
-        auto store = makeStore();
-        RoomRegistry registry(store);
-        auto c1 = makeConn();
-
-        auto j1 = registry.join(c1, "room-1", "alice", RoomType::Group);
-        ASSERT_TRUE(j1.ok);
-
-        EXPECT_EQ(store->sessions.size(), 1U);
-        EXPECT_EQ(store->sessions[j1.peerId].connection_state, "connected");
-    }
-
-    TEST(RoomRegistryTest, DisconnectRemovesSessionKeepsMember) {
-        auto store = makeStore();
-        RoomRegistry registry(store);
-        auto c1 = makeConn();
-
-        auto j1 = registry.join(c1, "room-1", "alice", RoomType::Group);
-        ASSERT_TRUE(j1.ok);
-
-        registry.disconnect(c1);
-
-        EXPECT_TRUE(store->sessions.empty());
-        EXPECT_TRUE(store->findMember(j1.peerId).has_value());
-        EXPECT_TRUE(store->findRoom("room-1").has_value());
     }
 
     TEST(RoomRegistryTest, LeaveCleansUpMemberFromDB) {

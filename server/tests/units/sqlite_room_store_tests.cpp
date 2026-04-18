@@ -6,7 +6,6 @@ namespace {
 
 using signaling::domain::RoomRecord;
 using signaling::domain::RoomMemberRecord;
-using signaling::domain::PeerSessionRecord;
 using signaling::infrastructure::SqliteRoomStore;
 
 class SqliteRoomStoreTest : public ::testing::Test {
@@ -94,37 +93,10 @@ TEST_F(SqliteRoomStoreTest, RemoveMember) {
 
 // --- PeerSession tests ---
 
-TEST_F(SqliteRoomStoreTest, SaveAndRemoveSession) {
-    store.saveRoom({"r1", "direct", "Room 1", "", "2026-01-01T00:00:00Z"});
-    store.saveMember({"p1", "alice", "2026-01-01T00:00:00Z", "r1"});
-    store.saveSession({"p1", "connected", "p1"});
-
-    // Session exists — remove it
-    store.removeSession("p1");
-    // No crash on double remove
-    store.removeSession("p1");
-}
-
-TEST_F(SqliteRoomStoreTest, ClearAllSessions) {
-    store.saveRoom({"r1", "group", "Room 1", "", "2026-01-01T00:00:00Z"});
-    store.saveMember({"p1", "alice", "2026-01-01T00:00:00Z", "r1"});
-    store.saveMember({"p2", "bob", "2026-01-01T00:00:00Z", "r1"});
-    store.saveSession({"p1", "connected", "p1"});
-    store.saveSession({"p2", "connected", "p2"});
-
-    store.clearAllSessions();
-
-    // Members and room still exist
-    EXPECT_TRUE(store.findRoom("r1").has_value());
-    EXPECT_TRUE(store.findMember("p1").has_value());
-    EXPECT_TRUE(store.findMember("p2").has_value());
-}
-
 TEST_F(SqliteRoomStoreTest, RemoveRoomCascadesMembers) {
     store.saveRoom({"r1", "group", "Room 1", "", "2026-01-01T00:00:00Z"});
     store.saveMember({"p1", "alice", "2026-01-01T00:00:00Z", "r1"});
     store.saveMember({"p2", "bob", "2026-01-01T00:00:00Z", "r1"});
-    store.saveSession({"p1", "connected", "p1"});
 
     store.removeRoom("r1");
 

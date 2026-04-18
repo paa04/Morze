@@ -20,12 +20,6 @@ struct RoomMemberRecord {
     int64_t last_acked_msg_seq{0};
 };
 
-struct PeerSessionRecord {
-    std::string peer_id;
-    std::string connection_state; // "connected" / "disconnected"
-    std::string member_id;
-};
-
 struct GroupMessageRecord {
     int64_t seq{0};           // auto-increment PK
     std::string room_id;

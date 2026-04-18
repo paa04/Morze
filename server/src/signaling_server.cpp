@@ -35,7 +35,6 @@ namespace signaling
                 dbPath = ":memory:";
             }
             auto store = std::make_shared<infrastructure::SqliteRoomStore>(dbPath);
-            store->clearAllSessions();
             registry = std::make_shared<domain::RoomRegistry>(store);
             handler = std::make_shared<application::MessageHandler>(registry);
         }

@@ -176,14 +176,6 @@ namespace signaling::domain
             });
         }
 
-        // Save peer session for group rooms
-        if (roomType == RoomType::Group)
-        {
-            store_->saveSession(PeerSessionRecord{
-                out.peerId, "connected", out.peerId
-            });
-        }
-
         // Register in RAM
         clients_.emplace(session.get(),
                          ClientInfo{roomId, out.peerId, username, roomType});
@@ -340,11 +332,6 @@ namespace signaling::domain
         out.peersToNotify = collectOnlinePeers(out.roomId, out.peerId);
 
         // Remove peer session from DB for group rooms
-        if (clientIt->second.roomType == RoomType::Group)
-        {
-            store_->removeSession(out.peerId);
-        }
-
         // Remove from RAM only — member stays in DB
         connections_.erase(out.peerId);
         clients_.erase(clientIt);
@@ -389,10 +376,6 @@ namespace signaling::domain
         out.peersToNotify = collectOnlinePeers(out.roomId, out.peerId);
 
         // Remove from DB
-        if (clientIt->second.roomType == RoomType::Group)
-        {
-            store_->removeSession(out.peerId);
-        }
         store_->removeMember(out.peerId);
 
         // Check if room is now empty → remove room

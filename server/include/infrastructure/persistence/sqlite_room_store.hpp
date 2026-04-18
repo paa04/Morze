@@ -23,12 +23,6 @@ public:
     std::vector<domain::RoomMemberRecord> findMembersByRoom(const std::string& roomId) override;
     void removeMember(const std::string& memberId) override;
 
-    // PeerSession CRUD
-    void saveSession(const domain::PeerSessionRecord& session) override;
-    void removeSession(const std::string& peerId) override;
-    void removeSessionsByRoom(const std::string& roomId) override;
-    void clearAllSessions() override;
-
     // Group message buffering
     int64_t saveGroupMessage(const domain::GroupMessageRecord& msg) override;
     std::vector<domain::GroupMessageRecord> getMessagesAfter(

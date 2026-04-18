@@ -28,12 +28,6 @@ inline auto makeStorage(const std::string& dbPath) {
             orm::make_column("last_acked_msg_seq", &RoomMemberRecord::last_acked_msg_seq),
             orm::primary_key(&RoomMemberRecord::member_id),
             orm::foreign_key(&RoomMemberRecord::room_id).references(&RoomRecord::room_id)),
-        orm::make_table("peer_sessions",
-            orm::make_column("peer_id", &PeerSessionRecord::peer_id),
-            orm::make_column("connection_state", &PeerSessionRecord::connection_state),
-            orm::make_column("member_id", &PeerSessionRecord::member_id),
-            orm::primary_key(&PeerSessionRecord::peer_id),
-            orm::foreign_key(&PeerSessionRecord::member_id).references(&RoomMemberRecord::member_id)),
         orm::make_table("group_messages",
             orm::make_column("seq", &GroupMessageRecord::seq),
             orm::make_column("room_id", &GroupMessageRecord::room_id),
@@ -78,7 +72,6 @@ std::optional<domain::RoomRecord> SqliteRoomStore::findRoom(const std::string& r
 void SqliteRoomStore::removeRoom(const std::string& roomId) {
     auto members = findMembersByRoom(roomId);
     for (const auto& m : members) {
-        removeSession(m.member_id);
         impl_->storage.remove<domain::RoomMemberRecord>(m.member_id);
     }
     removeGroupMessagesByRoom(roomId);
@@ -105,39 +98,7 @@ std::vector<domain::RoomMemberRecord> SqliteRoomStore::findMembersByRoom(const s
 }
 
 void SqliteRoomStore::removeMember(const std::string& memberId) {
-    using namespace domain;
-    auto sessions = impl_->storage.get_all<PeerSessionRecord>(
-        orm::where(orm::c(&PeerSessionRecord::member_id) == memberId));
-    for (const auto& s : sessions) {
-        impl_->storage.remove<PeerSessionRecord>(s.peer_id);
-    }
-    impl_->storage.remove<RoomMemberRecord>(memberId);
-}
-
-// --- PeerSession ---
-
-void SqliteRoomStore::saveSession(const domain::PeerSessionRecord& session) {
-    impl_->storage.replace(session);
-}
-
-void SqliteRoomStore::removeSession(const std::string& peerId) {
-    impl_->storage.remove<domain::PeerSessionRecord>(peerId);
-}
-
-void SqliteRoomStore::removeSessionsByRoom(const std::string& roomId) {
-    using namespace domain;
-    auto members = findMembersByRoom(roomId);
-    for (const auto& m : members) {
-        auto sessions = impl_->storage.get_all<PeerSessionRecord>(
-            orm::where(orm::c(&PeerSessionRecord::member_id) == m.member_id));
-        for (const auto& s : sessions) {
-            impl_->storage.remove<PeerSessionRecord>(s.peer_id);
-        }
-    }
-}
-
-void SqliteRoomStore::clearAllSessions() {
-    impl_->storage.remove_all<domain::PeerSessionRecord>();
+    impl_->storage.remove<domain::RoomMemberRecord>(memberId);
 }
 
 // --- Group Messages ---
