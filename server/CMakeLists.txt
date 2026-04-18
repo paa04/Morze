@@ -241,4 +241,10 @@ if (BUILD_TESTING)
   )
   set_tests_properties(group_chat_e2e_broadcast PROPERTIES LABELS e2e)
 
+  add_test(
+    NAME group_chat_e2e_buffered_messages
+    COMMAND p2p_chat_e2e_tests --gtest_filter=TestFixtureP2p.offline_member_receives_buffered_messages_on_reconnect
+  )
+  set_tests_properties(group_chat_e2e_buffered_messages PROPERTIES LABELS e2e)
+
 endif()

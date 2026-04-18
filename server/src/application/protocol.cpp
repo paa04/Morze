@@ -128,14 +128,46 @@ namespace signaling::application::protocol
     }
 
     json::object
-    makeGroupMessage(std::string_view roomId, std::string_view fromPeerId, const boost::json::value& payload)
+    makeGroupMessage(std::string_view roomId, std::string_view fromPeerId,
+                     int64_t messageSeq, const boost::json::value& payload)
     {
         json::object out;
         out["type"] = "group-message";
         out["roomId"] = roomId;
         out["fromPeerId"] = fromPeerId;
+        out["messageSeq"] = messageSeq;
         out["payload"] = payload;
+        return out;
+    }
 
+    json::object
+    makeBufferedMessages(std::string_view roomId,
+                         const std::vector<domain::BufferedMessage>& messages)
+    {
+        json::object out;
+        out["type"] = "buffered-messages";
+        out["roomId"] = roomId;
+
+        json::array arr;
+        for (const auto& m : messages)
+        {
+            json::object msg;
+            msg["messageSeq"] = m.seq;
+            msg["fromPeerId"] = m.fromPeerId;
+            msg["payload"] = json::parse(m.payload);
+            msg["createdAt"] = m.createdAt;
+            arr.push_back(std::move(msg));
+        }
+        out["messages"] = std::move(arr);
+        return out;
+    }
+
+    json::object makeAckConfirm(std::string_view roomId, int64_t upToSeq)
+    {
+        json::object out;
+        out["type"] = "ack-confirm";
+        out["roomId"] = roomId;
+        out["upToSeq"] = upToSeq;
         return out;
     }
 

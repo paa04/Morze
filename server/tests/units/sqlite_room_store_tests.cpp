@@ -6,7 +6,6 @@ namespace {
 
 using signaling::domain::RoomRecord;
 using signaling::domain::RoomMemberRecord;
-using signaling::domain::PeerSessionRecord;
 using signaling::infrastructure::SqliteRoomStore;
 
 class SqliteRoomStoreTest : public ::testing::Test {
@@ -94,37 +93,10 @@ TEST_F(SqliteRoomStoreTest, RemoveMember) {
 
 // --- PeerSession tests ---
 
-TEST_F(SqliteRoomStoreTest, SaveAndRemoveSession) {
-    store.saveRoom({"r1", "direct", "Room 1", "", "2026-01-01T00:00:00Z"});
-    store.saveMember({"p1", "alice", "2026-01-01T00:00:00Z", "r1"});
-    store.saveSession({"p1", "connected", "p1"});
-
-    // Session exists — remove it
-    store.removeSession("p1");
-    // No crash on double remove
-    store.removeSession("p1");
-}
-
-TEST_F(SqliteRoomStoreTest, ClearAllSessions) {
-    store.saveRoom({"r1", "group", "Room 1", "", "2026-01-01T00:00:00Z"});
-    store.saveMember({"p1", "alice", "2026-01-01T00:00:00Z", "r1"});
-    store.saveMember({"p2", "bob", "2026-01-01T00:00:00Z", "r1"});
-    store.saveSession({"p1", "connected", "p1"});
-    store.saveSession({"p2", "connected", "p2"});
-
-    store.clearAllSessions();
-
-    // Members and room still exist
-    EXPECT_TRUE(store.findRoom("r1").has_value());
-    EXPECT_TRUE(store.findMember("p1").has_value());
-    EXPECT_TRUE(store.findMember("p2").has_value());
-}
-
 TEST_F(SqliteRoomStoreTest, RemoveRoomCascadesMembers) {
     store.saveRoom({"r1", "group", "Room 1", "", "2026-01-01T00:00:00Z"});
     store.saveMember({"p1", "alice", "2026-01-01T00:00:00Z", "r1"});
     store.saveMember({"p2", "bob", "2026-01-01T00:00:00Z", "r1"});
-    store.saveSession({"p1", "connected", "p1"});
 
     store.removeRoom("r1");
 
@@ -132,6 +104,68 @@ TEST_F(SqliteRoomStoreTest, RemoveRoomCascadesMembers) {
     EXPECT_FALSE(store.findMember("p1").has_value());
     EXPECT_FALSE(store.findMember("p2").has_value());
     EXPECT_TRUE(store.findMembersByRoom("r1").empty());
+}
+
+// --- Group message tests ---
+
+TEST_F(SqliteRoomStoreTest, SaveAndGetGroupMessages) {
+    store.saveRoom({"r1", "group", "Room 1", "", "2026-01-01T00:00:00Z"});
+
+    auto s1 = store.saveGroupMessage({0, "r1", "p1", R"({"n":1})", "2026-01-01T00:00:01Z"});
+    auto s2 = store.saveGroupMessage({0, "r1", "p1", R"({"n":2})", "2026-01-01T00:00:02Z"});
+    auto s3 = store.saveGroupMessage({0, "r1", "p1", R"({"n":3})", "2026-01-01T00:00:03Z"});
+
+    EXPECT_GT(s1, 0);
+    EXPECT_EQ(s2, s1 + 1);
+    EXPECT_EQ(s3, s2 + 1);
+
+    auto msgs = store.getMessagesAfter("r1", s1);
+    EXPECT_EQ(msgs.size(), 2U);
+    EXPECT_EQ(msgs[0].seq, s2);
+    EXPECT_EQ(msgs[1].seq, s3);
+}
+
+TEST_F(SqliteRoomStoreTest, UpdateLastAckedSeq) {
+    store.saveRoom({"r1", "group", "Room 1", "", "2026-01-01T00:00:00Z"});
+    store.saveMember({"p1", "alice", "2026-01-01T00:00:00Z", "r1", 0});
+
+    store.updateLastAckedSeq("p1", 42);
+
+    auto member = store.findMember("p1");
+    ASSERT_TRUE(member.has_value());
+    EXPECT_EQ(member->last_acked_msg_seq, 42);
+}
+
+TEST_F(SqliteRoomStoreTest, CleanupMessagesDeletesUpToMinCursor) {
+    store.saveRoom({"r1", "group", "Room 1", "", "2026-01-01T00:00:00Z"});
+    store.saveMember({"p1", "alice", "2026-01-01T00:00:00Z", "r1", 0});
+    store.saveMember({"p2", "bob", "2026-01-01T00:00:00Z", "r1", 0});
+
+    auto s1 = store.saveGroupMessage({0, "r1", "p1", R"({"n":1})", "2026-01-01T00:00:01Z"});
+    auto s2 = store.saveGroupMessage({0, "r1", "p1", R"({"n":2})", "2026-01-01T00:00:02Z"});
+    store.saveGroupMessage({0, "r1", "p1", R"({"n":3})", "2026-01-01T00:00:03Z"});
+
+    // Alice acked up to s2, Bob only up to s1
+    store.updateLastAckedSeq("p1", s2);
+    store.updateLastAckedSeq("p2", s1);
+
+    store.cleanupMessages("r1");
+
+    // Only msg s1 should be deleted (min cursor = s1)
+    auto remaining = store.getMessagesAfter("r1", 0);
+    EXPECT_EQ(remaining.size(), 2U);
+    EXPECT_EQ(remaining[0].seq, s2);
+}
+
+TEST_F(SqliteRoomStoreTest, RemoveGroupMessagesByRoom) {
+    store.saveRoom({"r1", "group", "Room 1", "", "2026-01-01T00:00:00Z"});
+    store.saveGroupMessage({0, "r1", "p1", R"({"n":1})", "2026-01-01T00:00:01Z"});
+    store.saveGroupMessage({0, "r1", "p1", R"({"n":2})", "2026-01-01T00:00:02Z"});
+
+    store.removeGroupMessagesByRoom("r1");
+
+    auto msgs = store.getMessagesAfter("r1", 0);
+    EXPECT_TRUE(msgs.empty());
 }
 
 } // namespace

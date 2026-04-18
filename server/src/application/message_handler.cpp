@@ -93,6 +93,17 @@ namespace signaling::application
                                                           result.peerId,
                                                           result.participants)));
 
+            // Deliver buffered messages for group rooms on reconnect
+            if (result.roomType == domain::RoomType::Group)
+            {
+                auto pending = registry_->getPendingMessages(result.peerId);
+                if (!pending.empty())
+                {
+                    session->sendText(toText(
+                        protocol::makeBufferedMessages(result.roomId, pending)));
+                }
+            }
+
             auto joined = toText(protocol::makePeerJoined(result.roomId, result.peerId, *username));
             for (const auto &peer: result.peersToNotify)
             {
@@ -189,8 +200,9 @@ namespace signaling::application
             }
 
             std::string err;
+            auto serializedPayload = json::serialize(payloadIt->value());
 
-            auto broadcast_res = registry_->broadcast(session, roomId.value(), err);
+            auto broadcast_res = registry_->broadcast(session, roomId.value(), serializedPayload, err);
 
             if (!broadcast_res.has_value())
             {
@@ -198,12 +210,37 @@ namespace signaling::application
                 return;
             }
 
+            auto message = protocol::makeGroupMessage(
+                broadcast_res->roomId, broadcast_res->fromPeerId,
+                broadcast_res->messageSeq, boost::json::value(payloadIt->value()));
 
-            auto message = protocol::makeGroupMessage(broadcast_res->roomId, broadcast_res->fromPeerId, boost::json::value(payloadIt->value()));
-
-            for(const auto& member_conn: broadcast_res->recipients)
+            for (const auto& member_conn : broadcast_res->recipients)
                 member_conn->sendText(toText(message));
 
+            return;
+        }
+
+        if (*type == "ack")
+        {
+            const auto roomId = protocol::getStringField(*parsed, "roomId");
+            auto upToSeqIt = parsed->find("upToSeq");
+
+            if (!roomId.has_value() || upToSeqIt == parsed->end() || !upToSeqIt->value().is_int64())
+            {
+                session->sendText(toText(protocol::makeError("ack requires fields: roomId, upToSeq(int)")));
+                return;
+            }
+
+            std::string err;
+            auto upToSeq = upToSeqIt->value().as_int64();
+            bool ok = registry_->acknowledgeMessages(session, *roomId, upToSeq, err);
+            if (!ok)
+            {
+                session->sendText(toText(protocol::makeError(err)));
+                return;
+            }
+
+            session->sendText(toText(protocol::makeAckConfirm(*roomId, upToSeq)));
             return;
         }
 

@@ -23,11 +23,13 @@ public:
     virtual std::vector<RoomMemberRecord> findMembersByRoom(const std::string& roomId) = 0;
     virtual void removeMember(const std::string& memberId) = 0;
 
-    // PeerSession CRUD
-    virtual void saveSession(const PeerSessionRecord& session) = 0;
-    virtual void removeSession(const std::string& peerId) = 0;
-    virtual void removeSessionsByRoom(const std::string& roomId) = 0;
-    virtual void clearAllSessions() = 0;
+    // Group message buffering
+    virtual int64_t saveGroupMessage(const GroupMessageRecord& msg) = 0;
+    virtual std::vector<GroupMessageRecord> getMessagesAfter(
+        const std::string& roomId, int64_t afterSeq) = 0;
+    virtual void updateLastAckedSeq(const std::string& memberId, int64_t seq) = 0;
+    virtual void cleanupMessages(const std::string& roomId) = 0;
+    virtual void removeGroupMessagesByRoom(const std::string& roomId) = 0;
 };
 
 } // namespace signaling::domain
