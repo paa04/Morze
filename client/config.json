@@ -1,0 +1,12 @@
+{
+  "database": {
+    "path": "chat.db"
+  },
+  "logging": {
+    "level": "info",
+    "file": "logs/morze.log"
+  },
+  "signaling": {
+    "server_url": "ws://localhost:9001"
+  }
+}

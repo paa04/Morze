@@ -55,6 +55,32 @@ add_boost_library(detail            https://github.com/boostorg/detail          
 add_boost_library(system            https://github.com/boostorg/system          boost-1.90.0)
 add_boost_library(uuid              https://github.com/boostorg/uuid            boost-1.90.0)
 add_boost_library(asio              https://github.com/boostorg/asio            boost-1.90.0)
+add_boost_library(container         https://github.com/boostorg/container      boost-1.90.0)
+add_boost_library(intrusive         https://github.com/boostorg/intrusive       boost-1.90.0)
+add_boost_library(align             https://github.com/boostorg/align           boost-1.90.0)
+add_boost_library(describe          https://github.com/boostorg/describe        boost-1.90.0)
+add_boost_library(mp11              https://github.com/boostorg/mp11            boost-1.90.0)
+add_boost_library(utility           https://github.com/boostorg/utility         boost-1.90.0)
+add_boost_library(variant2          https://github.com/boostorg/variant2        boost-1.90.0)
+add_boost_library(endian            https://github.com/boostorg/endian          boost-1.90.0)
+
+FetchContent_Declare(
+        boost_json
+        GIT_REPOSITORY https://github.com/boostorg/json
+        GIT_TAG boost-1.90.0
+        GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(boost_json)
+
+target_link_libraries(boost_json INTERFACE
+        Boost_config Boost_core Boost_assert Boost_throw_exception
+        Boost_move Boost_type_traits Boost_predef Boost_static_assert
+        Boost_system Boost_detail Boost_container Boost_intrusive
+        Boost_align Boost_describe Boost_mp11 Boost_utility Boost_variant2
+        Boost_endian
+)
+# Создаём алиас для единообразия
+add_library(Boost::json ALIAS boost_json)
 
 target_link_libraries(Boost_uuid INTERFACE
         Boost_config Boost_core Boost_assert Boost_throw_exception
@@ -66,6 +92,7 @@ target_link_libraries(Boost_asio INTERFACE
         Boost_config Boost_core Boost_assert Boost_system Boost_throw_exception
         Boost_predef Boost_detail
 )
+
 
 # Настройки для Asio (теперь цель Boost_asio уже создана)
 target_compile_definitions(Boost_asio INTERFACE BOOST_ASIO_STANDALONE)
@@ -79,21 +106,23 @@ add_executable(Morze main.cpp
         repositories/DAO/ChatDAO.h
         repositories/DAO/ChatMemberDAO.h
         repositories/DAO/MessageDAO.h
-        GlobalEnums/GlobalEnums.h
+        globalEnums/GlobalEnums.h
         repositories/DAO/ConnectionProfileDAO.h
         repositories/DBConfiguration.h
-        GlobalEnums/MessageDirectionConverter.h
-        GlobalEnums/DeliveryStateConverter.h
-        GlobalEnums/ChatTypeConverter.h
-        GlobalConverters/TimePointConverter.h
-        GlobalConverters/UUIDConverter.h)
+        globalEnums/MessageDirectionConverter.h
+        globalEnums/DeliveryStateConverter.h
+        globalEnums/ChatTypeConverter.h
+        globalConverters/TimePointConverter.h
+        globalConverters/UUIDConverter.h
+        config/ConfigManager.cpp
+        config/ConfigManager.h)
 target_include_directories(Morze PRIVATE
         ./repositories/DAO
         ./repositories
-        ./GlobalEnums
-        ./GlobalConverters)
+        globalEnums
+        globalConverters)
 
-target_link_libraries(Morze PRIVATE sqlite_orm::sqlite_orm sqlite3 Boost::uuid Boost::asio)
+target_link_libraries(Morze PRIVATE sqlite_orm::sqlite_orm sqlite3 Boost::uuid Boost::asio Boost::json)
 
 if(WIN32)
     target_link_libraries(Morze PRIVATE ws2_32)
