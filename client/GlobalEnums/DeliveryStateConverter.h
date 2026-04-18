@@ -11,7 +11,7 @@
 
 class DeliveryStateConverter {
 public:
-    static std::string toString(const DeliveryState delivery_state) const {
+    static std::string toString(const DeliveryState delivery_state) {
         switch (delivery_state) {
             case DeliveryState::Delivered:  return "delivered";
             case DeliveryState::Failed:     return "failed";

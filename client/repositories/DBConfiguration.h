@@ -20,7 +20,7 @@ public:
     using namespace sqlite_orm;
     return make_storage(dbPath,
         make_table("chats",
-            make_column("chat_id", &ChatDAO::getChatId, &ChatDAO::setChatId),
+            make_column("chat_id", &ChatDAO::getChatId, &ChatDAO::setChatId, primary_key()),
             make_column("room_id", &ChatDAO::getRoomId, &ChatDAO::setRoomId),
             make_column("type", &ChatDAO::getTypeAsString, &ChatDAO::setTypeFromString),
             make_column("title", &ChatDAO::getTitle, &ChatDAO::setTitle),

@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 4.1)
 project(Morze)
 include(FetchContent)
 
+set(CMAKE_CXX_STANDARD 23)
+
 FetchContent_Declare(
         sqlite3
         URL https://www.sqlite.org/2026/sqlite-amalgamation-3530000.zip
@@ -54,13 +56,22 @@ add_boost_library(system            https://github.com/boostorg/system          
 add_boost_library(uuid              https://github.com/boostorg/uuid            boost-1.90.0)
 add_boost_library(asio              https://github.com/boostorg/asio            boost-1.90.0)
 
+target_link_libraries(Boost_uuid INTERFACE
+        Boost_config Boost_core Boost_assert Boost_throw_exception
+        Boost_move Boost_type_traits Boost_predef Boost_static_assert
+        Boost_winapi Boost_detail
+)
+
+target_link_libraries(Boost_asio INTERFACE
+        Boost_config Boost_core Boost_assert Boost_system Boost_throw_exception
+        Boost_predef Boost_detail
+)
+
 # Настройки для Asio (теперь цель Boost_asio уже создана)
 target_compile_definitions(Boost_asio INTERFACE BOOST_ASIO_STANDALONE)
 target_compile_definitions(Boost_asio INTERFACE BOOST_ASIO_HAS_CO_AWAIT)
 
 
-
-set(CMAKE_CXX_STANDARD 20)
 
 add_executable(Morze main.cpp
         repositories/dbContext/Database.cpp
@@ -73,11 +84,14 @@ add_executable(Morze main.cpp
         repositories/DBConfiguration.h
         GlobalEnums/MessageDirectionConverter.h
         GlobalEnums/DeliveryStateConverter.h
-        GlobalEnums/ChatTypeConverter.h)
+        GlobalEnums/ChatTypeConverter.h
+        GlobalConverters/TimePointConverter.h
+        GlobalConverters/UUIDConverter.h)
 target_include_directories(Morze PRIVATE
         ./repositories/DAO
         ./repositories
-        ./GlobalEnums)
+        ./GlobalEnums
+        ./GlobalConverters)
 
 target_link_libraries(Morze PRIVATE sqlite_orm::sqlite_orm sqlite3 Boost::uuid Boost::asio)
 
