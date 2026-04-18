@@ -5,7 +5,8 @@
 #ifndef MORZE_CONFIGMANAGER_H
 #define MORZE_CONFIGMANAGER_H
 #include <string>
-#include <boost/json.hpp>
+// #include <boost/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 
 
 class ConfigManager {
@@ -34,7 +35,7 @@ private:
     Logging logging_;
     Signaling signaling_;
 
-    void parse(const boost::json::object& obj);
+    void parse(const nlohmann::json& j);
 };
 
 

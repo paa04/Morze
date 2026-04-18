@@ -73,7 +73,8 @@ int main(int argc, char* argv[]) {
         );
         storage->insert(new_msg);
 
-        auto messages = storage->get_all<MessageDAO>(sqlite_orm::where(sqlite_orm::c(&MessageDAO::getChatId) == chat_id));
+        auto blob_chat_id = UUIDConverter::toBlob(chat_id);
+        auto messages = storage->get_all<MessageDAO>(sqlite_orm::where(sqlite_orm::c(&MessageDAO::getChatIdAsBLOB) == blob_chat_id));
         std::cout << "\nMessages in chat:\n";
         for (const auto& m : messages) {
             std::cout << "  [" << m.getCreatedAtAsString() << "] "

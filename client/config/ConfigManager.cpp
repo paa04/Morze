@@ -1,10 +1,10 @@
 #include <fstream>
 #include <iostream>
-#include <boost/json.hpp>
+#include <nlohmann/json.hpp>   // <-- изменили
 
 #include "ConfigManager.h"
 
-namespace json = boost::json;
+using json = nlohmann::json;    // <-- для удобства
 
 ConfigManager ConfigManager::loadFromFile(const std::string& filepath) {
     ConfigManager cfg;
@@ -14,42 +14,33 @@ ConfigManager ConfigManager::loadFromFile(const std::string& filepath) {
         return cfg;
     }
 
-    std::string content((std::istreambuf_iterator<char>(file)),
-                        std::istreambuf_iterator<char>());
-    boost::system::error_code ec;
-    json::value jv = json::parse(content, ec);
-    if (ec) {
-        std::cerr << "Failed to parse config: " << ec.message() << ", using defaults\n";
-        return cfg;
-    }
-
-    if (auto obj = jv.if_object()) {
-        cfg.parse(*obj);
+    try {
+        json j = json::parse(file);
+        cfg.parse(j);
+    } catch (const json::parse_error& e) {
+        std::cerr << "Failed to parse config: " << e.what() << ", using defaults\n";
     }
     return cfg;
 }
 
-void ConfigManager::parse(const json::object& obj) {
-    if (auto db = obj.if_contains("database")) {
-        if (auto dbObj = db->if_object()) {
-            if (auto path = dbObj->if_contains("path"))
-                database_.path = json::value_to<std::string>(*path);
-        }
+void ConfigManager::parse(const json& j) {
+    if (j.contains("database")) {
+        auto& db = j["database"];
+        if (db.contains("path"))
+            database_.path = db["path"].get<std::string>();
     }
 
-    if (auto log = obj.if_contains("logging")) {
-        if (auto logObj = log->if_object()) {
-            if (auto level = logObj->if_contains("level"))
-                logging_.level = json::value_to<std::string>(*level);
-            if (auto file = logObj->if_contains("file"))
-                logging_.file = json::value_to<std::string>(*file);
-        }
+    if (j.contains("logging")) {
+        auto& log = j["logging"];
+        if (log.contains("level"))
+            logging_.level = log["level"].get<std::string>();
+        if (log.contains("file"))
+            logging_.file = log["file"].get<std::string>();
     }
 
-    if (auto sig = obj.if_contains("signaling")) {
-        if (auto sigObj = sig->if_object()) {
-            if (auto url = sigObj->if_contains("server_url"))
-                signaling_.server_url = json::value_to<std::string>(*url);
-        }
+    if (j.contains("signaling")) {
+        auto& sig = j["signaling"];
+        if (sig.contains("server_url"))
+            signaling_.server_url = sig["server_url"].get<std::string>();
     }
 }
