@@ -35,7 +35,7 @@ boost::asio::awaitable<ChatModel> ChatRepository::getChatById(const boost::uuids
     co_return ChatDAOConverter::convert(results.front());
 }
 
-boost::asio::awaitable<void> ChatRepository::AddChat(const ChatDAO &chat) {
+boost::asio::awaitable<void> ChatRepository::addChat(const ChatDAO &chat) {
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
     auto blob = UUIDConverter::toBlob(chat.getChatId());
     auto existing = storage_->get_all<ChatDAO>(
@@ -48,7 +48,7 @@ boost::asio::awaitable<void> ChatRepository::AddChat(const ChatDAO &chat) {
     co_return;
 }
 
-boost::asio::awaitable<void> ChatRepository::UpdateChat(const ChatDAO &chat) {
+boost::asio::awaitable<void> ChatRepository::updateChat(const ChatDAO &chat) {
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
     auto blob = UUIDConverter::toBlob(chat.getChatId());
     auto existing = storage_->get_all<ChatDAO>(
@@ -62,7 +62,7 @@ boost::asio::awaitable<void> ChatRepository::UpdateChat(const ChatDAO &chat) {
 }
 
 
-boost::asio::awaitable<void> ChatRepository::RemoveChat(boost::uuids::uuid chatId) {
+boost::asio::awaitable<void> ChatRepository::removeChat(boost::uuids::uuid chatId) {
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
     auto blob = UUIDConverter::toBlob(chatId);
     storage_->remove_all<ChatDAO>(

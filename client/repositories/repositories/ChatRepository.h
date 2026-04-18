@@ -1,7 +1,3 @@
-//
-// Created by ivan on 18.04.2026.
-//
-
 #ifndef MORZE_CHATREPOSITORY_H
 #define MORZE_CHATREPOSITORY_H
 
@@ -30,13 +26,13 @@ public:
     boost::asio::awaitable<ChatModel> getChatById(boost::uuids::uuid chatId);
 
     // Вставляет новый чат, бросает AlreadyExistsError, если такой chatId уже есть
-    boost::asio::awaitable<void> AddChat(const ChatDAO& chat);
+    boost::asio::awaitable<void> addChat(const ChatDAO& chat);
 
     // Обновляет существующий чат, бросает NotFoundError, если не найден
-    boost::asio::awaitable<void> UpdateChat(const ChatDAO& chat);
+    boost::asio::awaitable<void> updateChat(const ChatDAO& chat);
 
     // Удаляет чат по ID
-    boost::asio::awaitable<void> RemoveChat(boost::uuids::uuid chatId);
+    boost::asio::awaitable<void> removeChat(boost::uuids::uuid chatId);
 
 private:
     boost::asio::io_context& ioc_;

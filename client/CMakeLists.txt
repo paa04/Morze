@@ -111,19 +111,68 @@ add_executable(Morze main.cpp
         repositories/repositories/ChatRepository.cpp
         repositories/repositories/ChatRepository.h)
 target_include_directories(Morze PRIVATE
-        ./repositories/DAO
-        ./repositories/DAO/Converters
-        ./repositories/repositories
-        ./repositories
-        ./globalEnums
-        ./globalConverters
-        ./services/Models
-        ./services
-        ./exceptions
+        ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
+        ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/Converters
+        ${CMAKE_CURRENT_SOURCE_DIR}/repositories/repositories
+        ${CMAKE_CURRENT_SOURCE_DIR}/repositories
+        ${CMAKE_CURRENT_SOURCE_DIR}/globalEnums
+        ${CMAKE_CURRENT_SOURCE_DIR}/globalConverters
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/Models
+        ${CMAKE_CURRENT_SOURCE_DIR}/services
+        ${CMAKE_CURRENT_SOURCE_DIR}/exceptions
         )
 
 target_link_libraries(Morze PRIVATE sqlite_orm::sqlite_orm sqlite3 Boost::uuid Boost::asio nlohmann_json::nlohmann_json)
 
 if(WIN32)
     target_link_libraries(Morze PRIVATE ws2_32)
+endif()
+
+# ------------------- Тесты -------------------
+option(BUILD_TESTS "Build unit tests" ON)
+
+if(BUILD_TESTS)
+    # Загружаем doctest через FetchContent
+    FetchContent_Declare(
+            doctest
+            GIT_REPOSITORY https://github.com/doctest/doctest.git
+            GIT_TAG v2.5.2
+    )
+    FetchContent_MakeAvailable(doctest)
+
+    # Исходники тестов
+    set(TEST_SOURCES
+            tests/TestChatRepository.cpp
+            repositories/repositories/ChatRepository.cpp
+    )
+
+    add_executable(MorzeTests ${TEST_SOURCES})
+
+    # Добавляем пути к заголовкам основного проекта (чтобы тесты видели репозитории и модели)
+    target_include_directories(MorzeTests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
+            ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/Converters
+            ${CMAKE_CURRENT_SOURCE_DIR}/repositories/repositories
+            ${CMAKE_CURRENT_SOURCE_DIR}/repositories
+            ${CMAKE_CURRENT_SOURCE_DIR}/globalEnums
+            ${CMAKE_CURRENT_SOURCE_DIR}/globalConverters
+            ${CMAKE_CURRENT_SOURCE_DIR}/services/Models
+            ${CMAKE_CURRENT_SOURCE_DIR}/services
+            ${CMAKE_CURRENT_SOURCE_DIR}/exceptions
+    )
+
+    # Линкуем всё то же, что и основное приложение + doctest
+    target_link_libraries(MorzeTests PRIVATE
+            sqlite_orm::sqlite_orm
+            sqlite3
+            Boost::uuid
+            Boost::asio
+            nlohmann_json::nlohmann_json
+            doctest::doctest
+    )
+
+    # Включаем CTest для интеграции с IDE
+    include(CTest)
+    add_test(NAME MorzeTests COMMAND MorzeTests)
 endif()
