@@ -1,5 +1,5 @@
-#ifndef MORZE_CHATDAO_H
-#define MORZE_CHATDAO_H
+#ifndef MORZE_CHATMODEL_H
+#define MORZE_CHATMODEL_H
 
 #include <chrono>
 #include <stdexcept>
@@ -11,11 +11,11 @@
 #include "TimePointConverter.h"
 #include "UUIDConverter.h"
 
-class ChatDAO {
+class ChatModel {
 public:
-    ChatDAO() = default;
+    ChatModel() = default;
 
-    ChatDAO(const boost::uuids::uuid chat_id,
+    ChatModel(const boost::uuids::uuid chat_id,
             const boost::uuids::uuid room_id,
             const ChatType type,
             std::string title,
@@ -72,4 +72,4 @@ private:
     std::chrono::system_clock::time_point created_at_;
 };
 
-#endif //MORZE_CHATDAO_H
+#endif //MORZE_CHATMODEL_H

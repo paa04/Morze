@@ -99,13 +99,28 @@ add_executable(Morze main.cpp
         globalConverters/TimePointConverter.h
         globalConverters/UUIDConverter.h
         config/ConfigManager.cpp
-        config/ConfigManager.h)
+        config/ConfigManager.h
+        repositories/DAO/Converters/ChatDAOConverter.h
+        services/Models/ChatMemberModel.h
+        services/Models/MessageModel.h
+        services/Models/ConnectionProfileModel.h
+        repositories/DAO/Converters/ChatMemberDAOConverter.h
+        repositories/DAO/Converters/ConnectionProfileDAOConverter.h
+        repositories/DAO/Converters/MessageDAOConverter.h
+        exceptions/ChatExcpetions.h
+        repositories/repositories/ChatRepository.cpp
+        repositories/repositories/ChatRepository.h)
 target_include_directories(Morze PRIVATE
         ./repositories/DAO
+        ./repositories/DAO/Converters
+        ./repositories/repositories
         ./repositories
-        globalEnums
-        globalConverters
-        ${boost_json_SOURCE_DIR}/include)
+        ./globalEnums
+        ./globalConverters
+        ./services/Models
+        ./services
+        ./exceptions
+        )
 
 target_link_libraries(Morze PRIVATE sqlite_orm::sqlite_orm sqlite3 Boost::uuid Boost::asio nlohmann_json::nlohmann_json)
 

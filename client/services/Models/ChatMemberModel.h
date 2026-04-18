@@ -1,5 +1,5 @@
-#ifndef MORZE_CHATMEMBERDAO_H
-#define MORZE_CHATMEMBERDAO_H
+#ifndef MORZE_CHATMEMBERMODEL_H
+#define MORZE_CHATMEMBERMODEL_H
 
 #include <chrono>
 #include <optional>
@@ -10,11 +10,11 @@
 #include "UUIDConverter.h"
 #include "TimePointConverter.h"
 
-class ChatMemberDAO {
+class ChatMemberModel {
 public:
-    ChatMemberDAO() = default;
+    ChatMemberModel() = default;
 
-    ChatMemberDAO(const boost::uuids::uuid id,
+    ChatMemberModel(const boost::uuids::uuid id,
                   const boost::uuids::uuid chat_id,
                   const std::optional<boost::uuids::uuid> &member_id,
                   const std::optional<boost::uuids::uuid> &peer_id,
@@ -143,4 +143,4 @@ private:
     std::optional<std::chrono::system_clock::time_point> last_online_at_;
 };
 
-#endif //MORZE_CHATMEMBERDAO_H
+#endif //MORZE_CHATMEMBERMODEL_H

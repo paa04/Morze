@@ -1,5 +1,5 @@
-#ifndef MORZE_CONNECTIONPROFILEDAO_H
-#define MORZE_CONNECTIONPROFILEDAO_H
+#ifndef MORZE_CONNECTIONPROFILEMODEL_H
+#define MORZE_CONNECTIONPROFILEMODEL_H
 
 #include <stdexcept>
 #include <string>
@@ -9,11 +9,11 @@
 #include "UUIDConverter.h"
 #include "TimePointConverter.h"
 
-class ConnectionProfileDAO {
+class ConnectionProfileModel {
 public:
-    ConnectionProfileDAO() = default;
+    ConnectionProfileModel() = default;
 
-    ConnectionProfileDAO(const boost::uuids::uuid id,
+    ConnectionProfileModel(const boost::uuids::uuid id,
                          std::string server_url,
                          std::string stun_url,
                          const std::chrono::system_clock::time_point updated_at)
@@ -72,4 +72,4 @@ private:
     }
 };
 
-#endif //MORZE_CONNECTIONPROFILEDAO_H
+#endif //MORZE_CONNECTIONPROFILEMODEL_H

@@ -1,5 +1,5 @@
-#ifndef MORZE_MESSAGEDAO_H
-#define MORZE_MESSAGEDAO_H
+#ifndef MORZE_MESSAGEMODEL_H
+#define MORZE_MESSAGEMODEL_H
 
 #include <algorithm>
 #include <stdexcept>
@@ -12,11 +12,11 @@
 #include "TimePointConverter.h"
 #include "UUIDConverter.h"
 
-class MessageDAO {
+class MessageModel {
 public:
-    MessageDAO() = default;
+    MessageModel() = default;
 
-    MessageDAO(const boost::uuids::uuid message_id,
+    MessageModel(const boost::uuids::uuid message_id,
                const boost::uuids::uuid chat_id,
                std::string sender_name,
                const MessageDirection direction,
@@ -100,4 +100,4 @@ private:
     }
 };
 
-#endif //MORZE_MESSAGEDAO_H
+#endif //MORZE_MESSAGEMODEL_H

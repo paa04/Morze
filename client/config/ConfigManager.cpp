@@ -1,10 +1,10 @@
 #include <fstream>
 #include <iostream>
-#include <nlohmann/json.hpp>   // <-- изменили
+#include <nlohmann/json.hpp>
 
 #include "ConfigManager.h"
 
-using json = nlohmann::json;    // <-- для удобства
+using json = nlohmann::json;
 
 ConfigManager ConfigManager::loadFromFile(const std::string& filepath) {
     ConfigManager cfg;

@@ -15,14 +15,14 @@ public:
         using namespace sqlite_orm;
         return make_storage(dbPath,
             make_table("chats",
-                make_column("chat_id", &ChatDAO::getChatIdAsBLOB, &ChatDAO::setChatIdFromBLOB),
+                make_column("chat_id", &ChatDAO::getChatIdAsBLOB, &ChatDAO::setChatIdFromBLOB, primary_key()),
                 make_column("room_id", &ChatDAO::getRoomIdAsBLOB, &ChatDAO::setRoomIdFromBLOB),
                 make_column("type", &ChatDAO::getTypeAsString, &ChatDAO::setTypeFromString),
                 make_column("title", &ChatDAO::getTitle, &ChatDAO::setTitle),
                 make_column("created_at", &ChatDAO::getCreatedAtAsUnix, &ChatDAO::setCreatedAtFromUnixTime)
             ),
             make_table("chat_members",
-                make_column("id", &ChatMemberDAO::getIdAsBLOB, &ChatMemberDAO::setIdFromBLOB),
+                make_column("id", &ChatMemberDAO::getIdAsBLOB, &ChatMemberDAO::setIdFromBLOB, primary_key()),
                 make_column("chat_id", &ChatMemberDAO::getChatIdAsBLOB, &ChatMemberDAO::setChatIdFromBLOB),
                 make_column("member_id", &ChatMemberDAO::getMemberIdAsBLOB, &ChatMemberDAO::setMemberIdFromBLOB),
                 make_column("peer_id", &ChatMemberDAO::getPeerIdAsBLOB, &ChatMemberDAO::setPeerIdFromBLOB),
@@ -30,7 +30,7 @@ public:
                 make_column("last_online_at", &ChatMemberDAO::getLastOnlineAtAsUnix, &ChatMemberDAO::setLastOnlineAtFromUnix)
             ),
             make_table("messages",
-                make_column("message_id", &MessageDAO::getMessageIdAsBLOB, &MessageDAO::setMessageIdFromBLOB),
+                make_column("message_id", &MessageDAO::getMessageIdAsBLOB, &MessageDAO::setMessageIdFromBLOB, primary_key()),
                 make_column("chat_id", &MessageDAO::getChatIdAsBLOB, &MessageDAO::setChatIdFromBLOB),
                 make_column("sender_name", &MessageDAO::getSenderName, &MessageDAO::setSenderName),
                 make_column("direction", &MessageDAO::getDirectionAsString, &MessageDAO::setDirectionFromString),
@@ -39,7 +39,7 @@ public:
                 make_column("delivery_state", &MessageDAO::getDeliveryStateAsString, &MessageDAO::setDeliveryStateFromString)
             ),
             make_table("connection_profiles",
-                make_column("id", &ConnectionProfileDAO::getIdAsBLOB, &ConnectionProfileDAO::setIdFromBLOB),
+                make_column("id", &ConnectionProfileDAO::getIdAsBLOB, &ConnectionProfileDAO::setIdFromBLOB, primary_key()),
                 make_column("server_url", &ConnectionProfileDAO::getServerUrl, &ConnectionProfileDAO::setServerUrl),
                 make_column("stun_url", &ConnectionProfileDAO::getStunUrl, &ConnectionProfileDAO::setStunUrl),
                 make_column("updated_at", &ConnectionProfileDAO::getUpdatedAtAsUnix, &ConnectionProfileDAO::setUpdatedAtFromUnix)
