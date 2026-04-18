@@ -2,9 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches:
+      - '**'            # запуск при пуше в любую ветку
   pull_request:
-    branches: [ "main", "develop" ]
+    branches:
+      - '**'            # запуск при создании/обновлении PR в любую ветку
+  workflow_dispatch:    # возможность ручного запуска из интерфейса GitHub
 
 jobs:
   test:
