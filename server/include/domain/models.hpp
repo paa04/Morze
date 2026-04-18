@@ -17,12 +17,21 @@ struct RoomMemberRecord {
     std::string username;
     std::string last_online_at;
     std::string room_id;
+    int64_t last_acked_msg_seq{0};
 };
 
 struct PeerSessionRecord {
     std::string peer_id;
     std::string connection_state; // "connected" / "disconnected"
     std::string member_id;
+};
+
+struct GroupMessageRecord {
+    int64_t seq{0};           // auto-increment PK
+    std::string room_id;
+    std::string from_peer_id;
+    std::string payload;      // JSON-serialized
+    std::string created_at;
 };
 
 } // namespace signaling::domain

@@ -55,6 +55,14 @@ struct BroadcastResult {
     std::vector<std::shared_ptr<IConnection>> recipients;
     std::string fromPeerId;
     std::string roomId;
+    int64_t messageSeq{0};
+};
+
+struct BufferedMessage {
+    int64_t seq;
+    std::string fromPeerId;
+    std::string payload;
+    std::string createdAt;
 };
 
 struct DisconnectResult {
@@ -80,7 +88,15 @@ public:
 
     std::optional<BroadcastResult> broadcast(const std::shared_ptr<IConnection>& sender,
                                              const std::string& roomId,
+                                             const std::string& payload,
                                              std::string& error);
+
+  std::vector<BufferedMessage> getPendingMessages(const std::string& memberId);
+
+  bool acknowledgeMessages(const std::shared_ptr<IConnection>& session,
+                           const std::string& roomId,
+                           int64_t upToSeq,
+                           std::string& error);
 
   LeaveResult leave(const std::shared_ptr<IConnection>& session,
                     const std::optional<std::string>& roomIdCheck,

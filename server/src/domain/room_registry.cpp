@@ -238,7 +238,8 @@ namespace signaling::domain
     }
 
     std::optional<BroadcastResult>
-    RoomRegistry::broadcast(const std::shared_ptr<IConnection> &sender, const std::string &roomId, std::string &error)
+    RoomRegistry::broadcast(const std::shared_ptr<IConnection> &sender, const std::string &roomId,
+                            const std::string &payload, std::string &error)
     {
         std::lock_guard<std::mutex> lock(mu_);
 
@@ -262,8 +263,61 @@ namespace signaling::domain
             return std::nullopt;
         }
 
+        // Save message to DB
+        auto seq = store_->saveGroupMessage(GroupMessageRecord{
+            0, roomId, senderIt->second.peerId, payload, currentTimestamp()
+        });
+
         auto recipients = collectOnlinePeers(roomId, senderIt->second.peerId);
-        return BroadcastResult{std::move(recipients), senderIt->second.peerId, roomId};
+        return BroadcastResult{std::move(recipients), senderIt->second.peerId, roomId, seq};
+    }
+
+    std::vector<BufferedMessage> RoomRegistry::getPendingMessages(const std::string &memberId)
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+
+        auto member = store_->findMember(memberId);
+        if (!member.has_value())
+        {
+            return {};
+        }
+
+        auto msgs = store_->getMessagesAfter(member->room_id, member->last_acked_msg_seq);
+
+        std::vector<BufferedMessage> result;
+        result.reserve(msgs.size());
+        for (const auto &m : msgs)
+        {
+            result.push_back(BufferedMessage{
+                m.seq, m.from_peer_id, m.payload, m.created_at
+            });
+        }
+        return result;
+    }
+
+    bool RoomRegistry::acknowledgeMessages(const std::shared_ptr<IConnection> &session,
+                                           const std::string &roomId,
+                                           int64_t upToSeq,
+                                           std::string &error)
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+
+        auto clientIt = clients_.find(session.get());
+        if (clientIt == clients_.end())
+        {
+            error = "session is not in any room";
+            return false;
+        }
+
+        if (clientIt->second.roomId != roomId)
+        {
+            error = "roomId does not match active session room";
+            return false;
+        }
+
+        store_->updateLastAckedSeq(clientIt->second.peerId, upToSeq);
+        store_->cleanupMessages(roomId);
+        return true;
     }
 
     DisconnectResult RoomRegistry::disconnect(const std::shared_ptr<IConnection> &session)
@@ -345,7 +399,12 @@ namespace signaling::domain
         auto remaining = store_->findMembersByRoom(out.roomId);
         if (remaining.empty())
         {
+            store_->removeGroupMessagesByRoom(out.roomId);
             store_->removeRoom(out.roomId);
+        } else
+        {
+            // Member left — their cursor no longer blocks cleanup
+            store_->cleanupMessages(out.roomId);
         }
 
         // Remove from RAM

@@ -29,6 +29,14 @@ public:
     void removeSessionsByRoom(const std::string& roomId) override;
     void clearAllSessions() override;
 
+    // Group message buffering
+    int64_t saveGroupMessage(const domain::GroupMessageRecord& msg) override;
+    std::vector<domain::GroupMessageRecord> getMessagesAfter(
+        const std::string& roomId, int64_t afterSeq) override;
+    void updateLastAckedSeq(const std::string& memberId, int64_t seq) override;
+    void cleanupMessages(const std::string& roomId) override;
+    void removeGroupMessagesByRoom(const std::string& roomId) override;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
