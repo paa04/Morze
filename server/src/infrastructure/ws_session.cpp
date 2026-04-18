@@ -30,6 +30,9 @@ namespace signaling::infrastructure {
     void WsSession::sendText(std::string payload) {
         auto self = shared_from_this();
         asio::post(ws_.get_executor(), [self, payload = std::move(payload)]() mutable {
+            if (self->closed_) {
+                return;
+            }
             const bool writing = !self->outbox_.empty();
             self->outbox_.push_back(std::move(payload));
             if (!writing) {
@@ -63,6 +66,9 @@ namespace signaling::infrastructure {
     }
 
     void WsSession::doWrite() {
+        if (closed_) {
+            return;
+        }
         ws_.text(true);
         ws_.async_write(asio::buffer(outbox_.front()),
                         beast::bind_front_handler(&WsSession::onWrite, shared_from_this()));
@@ -85,6 +91,7 @@ namespace signaling::infrastructure {
             return;
         }
         closed_ = true;
+        outbox_.clear();
         handler_->handleDisconnect(shared_from_this());
     }
 

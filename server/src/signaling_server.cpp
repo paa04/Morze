@@ -3,6 +3,7 @@
 #include "application/message_handler.hpp"
 #include "domain/room_registry.hpp"
 #include "infrastructure/listener.hpp"
+#include "infrastructure/persistence/sqlite_room_store.hpp"
 
 #include <boost/asio.hpp>
 
@@ -23,19 +24,30 @@ namespace signaling
     {
         using WorkGuard = boost::asio::executor_work_guard<boost::asio::io_context::executor_type>;
 
-        explicit Impl(uint16_t p, std::size_t t)
-                : port(p), threads(std::max<std::size_t>(1, t)), ioc(static_cast<int>(threads)), work_guard(boost::asio::make_work_guard(ioc))
-        {}
+        explicit Impl(uint16_t p, std::size_t t, std::string db)
+                : port(p), threads(std::max<std::size_t>(1, t)),
+                  dbPath(std::move(db)),
+                  ioc(static_cast<int>(threads)),
+                  work_guard(boost::asio::make_work_guard(ioc))
+        {
+            if (dbPath.empty())
+            {
+                dbPath = ":memory:";
+            }
+            auto store = std::make_shared<infrastructure::SqliteRoomStore>(dbPath);
+            registry = std::make_shared<domain::RoomRegistry>(store);
+            handler = std::make_shared<application::MessageHandler>(registry);
+        }
 
         uint16_t port;
         std::size_t threads;
+        std::string dbPath;
 
         asio::io_context ioc;
         WorkGuard work_guard;
 
-        std::shared_ptr<domain::RoomRegistry> registry = std::make_shared<domain::RoomRegistry>();
-        std::shared_ptr<application::MessageHandler> handler =
-                std::make_shared<application::MessageHandler>(registry);
+        std::shared_ptr<domain::RoomRegistry> registry;
+        std::shared_ptr<application::MessageHandler> handler;
         std::shared_ptr<infrastructure::Listener> listener;
         std::vector<std::thread> workers;
 
@@ -44,8 +56,8 @@ namespace signaling
 
     };
 
-    SignalingServer::SignalingServer(uint16_t port, std::size_t threads)
-            : impl_(std::make_unique<Impl>(port, threads))
+    SignalingServer::SignalingServer(uint16_t port, std::size_t threads, std::string dbPath)
+            : impl_(std::make_unique<Impl>(port, threads, std::move(dbPath)))
     {}
 
     SignalingServer::~SignalingServer()

@@ -36,4 +36,14 @@ boost::json::object makeIceCandidate(std::string_view roomId,
                                      std::string_view toPeerId,
                                      const boost::json::value& candidate);
 
+boost::json::object makeGroupMessage(std::string_view roomId,
+                                     std::string_view fromPeerId,
+                                     int64_t messageSeq,
+                                     const boost::json::value& payload);
+
+boost::json::object makeBufferedMessages(std::string_view roomId,
+                                          const std::vector<domain::BufferedMessage>& messages);
+
+boost::json::object makeAckConfirm(std::string_view roomId, int64_t upToSeq);
+
 } // namespace signaling::application::protocol
