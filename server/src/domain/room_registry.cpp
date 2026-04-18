@@ -1,18 +1,64 @@
 #include "domain/room_registry.hpp"
 
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+
 namespace signaling::domain
 {
 
-    std::string RoomRegistry::generatePeerIdLocked(RoomInfo &room)
+    RoomRegistry::RoomRegistry(std::shared_ptr<IRoomStore> store)
+        : store_(std::move(store))
+    {}
+
+    std::string RoomRegistry::currentTimestamp() const
     {
-        while (true)
+        auto now = std::chrono::system_clock::now();
+        auto time = std::chrono::system_clock::to_time_t(now);
+        std::ostringstream oss;
+        oss << std::put_time(std::gmtime(&time), "%Y-%m-%dT%H:%M:%SZ");
+        return oss.str();
+    }
+
+    std::string RoomRegistry::roomTypeToString(RoomType type) const
+    {
+        return type == RoomType::Direct ? "direct" : "group";
+    }
+
+    RoomType RoomRegistry::parseRoomType(const std::string &type)
+    {
+        return type == "group" ? RoomType::Group : RoomType::Direct;
+    }
+
+    std::string RoomRegistry::generatePeerId()
+    {
+        return "peer" + std::to_string(nextPeerSeq_++);
+    }
+
+    std::vector<std::shared_ptr<IConnection>> RoomRegistry::collectOnlinePeers(
+        const std::string &roomId, const std::string &excludePeerId)
+    {
+        std::vector<std::shared_ptr<IConnection>> result;
+        auto members = store_->findMembersByRoom(roomId);
+        for (const auto &m : members)
         {
-            const std::string candidate = "peer" + std::to_string(nextPeerSeq_++);
-            if (room.members.find(candidate) == room.members.end())
+            if (m.member_id == excludePeerId)
             {
-                return candidate;
+                continue;
+            }
+            auto connIt = connections_.find(m.member_id);
+            if (connIt != connections_.end())
+            {
+                if (auto alive = connIt->second.lock())
+                {
+                    result.push_back(std::move(alive));
+                } else
+                {
+                    connections_.erase(connIt);
+                }
             }
         }
+        return result;
     }
 
     JoinResult RoomRegistry::join(const std::shared_ptr<IConnection> &session,
@@ -35,56 +81,113 @@ namespace signaling::domain
             return out;
         }
 
-        auto &room = rooms_[roomId];
-        for (auto it = room.members.begin(); it != room.members.end();)
-        {
-            if (it->second.session.expired())
-            {
-                it = room.members.erase(it);
-            } else
-            {
-                ++it;
-            }
-        }
+        auto now = currentTimestamp();
 
-        if (!room.initialized)
+        // Check if room exists in DB
+        auto roomOpt = store_->findRoom(roomId);
+        RoomType roomType;
+
+        if (roomOpt.has_value())
         {
-            room.roomType = requestedRoomType.value_or(RoomType::Direct);
-            room.initialized = true;
-        } else if (requestedRoomType.has_value() && room.roomType != *requestedRoomType)
+            roomType = parseRoomType(roomOpt->type);
+            if (requestedRoomType.has_value() && roomType != *requestedRoomType)
+            {
+                out.error = "room type mismatch";
+                return out;
+            }
+        } else
         {
-            out.error = "room type mismatch";
-            return out;
+            // New room
+            roomType = requestedRoomType.value_or(RoomType::Direct);
+            store_->saveRoom(RoomRecord{
+                roomId,
+                roomTypeToString(roomType),
+                roomId,
+                "",
+                now
+            });
         }
 
         out.roomId = roomId;
-        out.roomType = room.roomType;
+        out.roomType = roomType;
 
-        for (auto it = room.members.begin(); it != room.members.end();)
+        // Check for reconnection: existing member with same username
+        auto members = store_->findMembersByRoom(roomId);
+        std::string existingPeerId;
+
+        for (const auto &m : members)
         {
-            if (auto alive = it->second.session.lock())
+            if (m.username == username)
             {
-                out.participants.push_back(Participant{it->first, it->second.username});
-                out.peersToNotify.push_back(std::move(alive));
-                ++it;
-            } else
-            {
-                it = room.members.erase(it);
+                // Check if this member is online
+                auto connIt = connections_.find(m.member_id);
+                if (connIt != connections_.end() && connIt->second.lock())
+                {
+                    out.error = "username already in use in this room";
+                    return out;
+                }
+                existingPeerId = m.member_id;
+                break;
             }
         }
 
-        if (room.roomType == RoomType::Direct && out.participants.size() >= 2)
+        bool isReconnect = !existingPeerId.empty();
+
+        // Check Direct room capacity (only for new members)
+        if (!isReconnect && roomType == RoomType::Direct && members.size() >= 2)
         {
             out.error = "direct room supports at most 2 participants";
             return out;
         }
 
-        out.peerId = generatePeerIdLocked(room);
-        room.members.emplace(out.peerId, MemberInfo{session, username});
+        // Build participants list (online peers only, excluding self)
+        for (const auto &m : members)
+        {
+            if (isReconnect && m.member_id == existingPeerId)
+            {
+                continue;
+            }
+            auto connIt = connections_.find(m.member_id);
+            if (connIt != connections_.end())
+            {
+                if (auto alive = connIt->second.lock())
+                {
+                    out.participants.push_back(Participant{m.member_id, m.username});
+                    out.peersToNotify.push_back(std::move(alive));
+                } else
+                {
+                    connections_.erase(connIt);
+                }
+            }
+        }
 
-        clients_.emplace(
-                session.get(),
-                ClientInfo{roomId, out.peerId, std::move(username), room.roomType});
+        if (isReconnect)
+        {
+            out.peerId = existingPeerId;
+            // Update last_online_at
+            store_->saveMember(RoomMemberRecord{
+                existingPeerId, username, now, roomId
+            });
+        } else
+        {
+            out.peerId = generatePeerId();
+            store_->saveMember(RoomMemberRecord{
+                out.peerId, username, now, roomId
+            });
+        }
+
+        // Save peer session for group rooms
+        if (roomType == RoomType::Group)
+        {
+            store_->saveSession(PeerSessionRecord{
+                out.peerId, "connected", out.peerId
+            });
+        }
+
+        // Register in RAM
+        clients_.emplace(session.get(),
+                         ClientInfo{roomId, out.peerId, username, roomType});
+        connections_[out.peerId] = session;
 
         out.ok = true;
         return out;
@@ -110,31 +213,24 @@ namespace signaling::domain
             return std::nullopt;
         }
 
-        auto roomIt = rooms_.find(roomId);
-        if (roomIt == rooms_.end())
-        {
-            error = "room not found";
-            return std::nullopt;
-        }
-
-        if (roomIt->second.roomType != RoomType::Direct)
+        if (senderIt->second.roomType != RoomType::Direct)
         {
             error = "offer/answer/ice-candidate are allowed only in direct rooms";
             return std::nullopt;
         }
 
-        auto targetIt = roomIt->second.members.find(toPeerId);
-        if (targetIt == roomIt->second.members.end())
+        auto connIt = connections_.find(toPeerId);
+        if (connIt == connections_.end())
         {
-            error = "target peer not found";
+            error = "target peer is offline";
             return std::nullopt;
         }
 
-        auto target = targetIt->second.session.lock();
+        auto target = connIt->second.lock();
         if (!target)
         {
-            roomIt->second.members.erase(targetIt);
-            error = "target peer not found";
+            connections_.erase(connIt);
+            error = "target peer is offline";
             return std::nullopt;
         }
 
@@ -160,43 +256,45 @@ namespace signaling::domain
             return std::nullopt;
         }
 
-        auto roomIt = rooms_.find(roomId);
-        if (roomIt == rooms_.end())
-        {
-            error = "room not found";
-            return std::nullopt;
-        }
-
-        if (roomIt->second.roomType != RoomType::Group)
+        if (senderIt->second.roomType != RoomType::Group)
         {
             error = "group message allowed only in group chats";
             return std::nullopt;
         }
 
-        std::vector<std::shared_ptr<IConnection>> recipients_vec = std::vector<std::shared_ptr<IConnection>>();
+        auto recipients = collectOnlinePeers(roomId, senderIt->second.peerId);
+        return BroadcastResult{std::move(recipients), senderIt->second.peerId, roomId};
+    }
 
-        for (auto it = roomIt->second.members.begin(); it != roomIt->second.members.end();)
+    DisconnectResult RoomRegistry::disconnect(const std::shared_ptr<IConnection> &session)
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+
+        DisconnectResult out;
+
+        auto clientIt = clients_.find(session.get());
+        if (clientIt == clients_.end())
         {
-            if (it->first == senderIt->second.peerId)
-            {
-                ++it;
-                continue;
-            }
-
-            auto alive = it->second.session.lock();
-
-            if (alive)
-            {
-                recipients_vec.emplace_back(alive);
-                ++it;
-            } else
-            {
-                it = roomIt->second.members.erase(it);
-            }
-
+            return out;
         }
 
-        return BroadcastResult{recipients_vec, senderIt->second.peerId, roomId};
+        out.hadMembership = true;
+        out.roomId = clientIt->second.roomId;
+        out.peerId = clientIt->second.peerId;
+
+        // Collect online peers to notify before removing connection
+        out.peersToNotify = collectOnlinePeers(out.roomId, out.peerId);
+
+        // Remove peer session from DB for group rooms
+        if (clientIt->second.roomType == RoomType::Group)
+        {
+            store_->removeSession(out.peerId);
+        }
+
+        // Remove from RAM only — member stays in DB
+        connections_.erase(out.peerId);
+        clients_.erase(clientIt);
+        return out;
     }
 
     LeaveResult RoomRegistry::leave(const std::shared_ptr<IConnection> &session,
@@ -233,29 +331,25 @@ namespace signaling::domain
         out.roomId = clientIt->second.roomId;
         out.peerId = clientIt->second.peerId;
 
-        auto roomIt = rooms_.find(out.roomId);
-        if (roomIt != rooms_.end())
+        // Collect online peers to notify
+        out.peersToNotify = collectOnlinePeers(out.roomId, out.peerId);
+
+        // Remove from DB
+        if (clientIt->second.roomType == RoomType::Group)
         {
-            roomIt->second.members.erase(out.peerId);
+            store_->removeSession(out.peerId);
+        }
+        store_->removeMember(out.peerId);
 
-            for (auto it = roomIt->second.members.begin(); it != roomIt->second.members.end();)
-            {
-                if (auto alive = it->second.session.lock())
-                {
-                    out.peersToNotify.push_back(std::move(alive));
-                    ++it;
-                } else
-                {
-                    it = roomIt->second.members.erase(it);
-                }
-            }
-
-            if (roomIt->second.members.empty())
-            {
-                rooms_.erase(roomIt);
-            }
+        // Check if room is now empty → remove room
+        auto remaining = store_->findMembersByRoom(out.roomId);
+        if (remaining.empty())
+        {
+            store_->removeRoom(out.roomId);
         }
 
+        // Remove from RAM
+        connections_.erase(out.peerId);
         clients_.erase(clientIt);
         return out;
     }

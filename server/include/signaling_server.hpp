@@ -2,12 +2,14 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
 namespace signaling {
 
     class SignalingServer {
     public:
-        explicit SignalingServer(uint16_t port, std::size_t threads = 1);
+        explicit SignalingServer(uint16_t port, std::size_t threads = 1,
+                                std::string dbPath = "");
 
         ~SignalingServer();
 

@@ -212,15 +212,15 @@ namespace signaling::application
 
     void MessageHandler::handleDisconnect(const std::shared_ptr<domain::IConnection> &session)
     {
-        std::string ignoredError;
-        auto leave = registry_->leave(session, std::nullopt, std::nullopt, ignoredError);
-        if (!leave.hadMembership)
+        auto result = registry_->disconnect(session);
+        if (!result.hadMembership)
         {
             return;
         }
 
-        const auto leftMsg = toText(protocol::makePeerLeft(leave.roomId, leave.peerId));
-        for (const auto &peer: leave.peersToNotify)
+        // Notify peers that this member went offline (not "left" — they're still a member)
+        const auto leftMsg = toText(protocol::makePeerLeft(result.roomId, result.peerId));
+        for (const auto &peer: result.peersToNotify)
         {
             peer->sendText(leftMsg);
         }
