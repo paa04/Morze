@@ -145,8 +145,11 @@ if(BUILD_TESTS)
 
     # Исходники тестов
     set(TEST_SOURCES
-            tests/TestChatRepository.cpp
+            tests/repository/TestChatRepository.cpp
             repositories/repositories/ChatRepository.cpp
+            repositories/repositories/ChatMemberRepository.cpp
+            tests/repository/TestChatMemberRepository.cpp
+            tests/TestMain.cpp
     )
 
     add_executable(MorzeTests ${TEST_SOURCES})

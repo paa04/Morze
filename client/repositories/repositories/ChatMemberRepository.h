@@ -20,7 +20,7 @@ public:
     explicit ChatMemberRepository(boost::asio::io_context &ioc, std::shared_ptr<Storage> storage);
 
     // CRUD
-    boost::asio::awaitable<std::vector<ChatMemberModel> > getAllMembers() const;
+    boost::asio::awaitable<std::vector<ChatMemberModel> > getAllMembers(bool orderByLastOnlineDesc = true) const;
 
     boost::asio::awaitable<ChatMemberModel> getMemberById(boost::uuids::uuid id);
 
@@ -31,15 +31,12 @@ public:
     boost::asio::awaitable<void> removeMember(boost::uuids::uuid id);
 
     // Специфичные выборки
-    boost::asio::awaitable<std::vector<ChatMemberModel> > getMembersByChatId(boost::uuids::uuid chatId,
-        std::optional<std::chrono::system_clock::time_point> from = std::nullopt);
-
-    boost::asio::awaitable<std::vector<ChatMemberModel> > getMembersByUsername(const std::string &username);
+    boost::asio::awaitable<std::vector<ChatMemberModel> > getMembersByUsername(
+        const std::string &username, bool orderByLastOnlineDesc = true);
 
 private:
     boost::asio::io_context &ioc_;
     std::shared_ptr<Storage> storage_;
 };
-
 
 #endif //MORZE_CHATMEMBERREPOSITORY_H

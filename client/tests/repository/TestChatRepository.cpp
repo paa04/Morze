@@ -1,4 +1,3 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/io_context.hpp>

@@ -5,6 +5,7 @@
 #include <boost/asio/post.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <boost/asio/io_context.hpp>
+#include <sqlite_orm/sqlite_orm.h>
 
 #include "ChatMemberRepository.h"
 #include "ChatMemberDAOConverter.h"
@@ -16,9 +17,18 @@ ChatMemberRepository::ChatMemberRepository(boost::asio::io_context& ioc, std::sh
     : ioc_(ioc), storage_(std::move(storage))
 {}
 
-boost::asio::awaitable<std::vector<ChatMemberModel>> ChatMemberRepository::getAllMembers() const {
+boost::asio::awaitable<std::vector<ChatMemberModel>> ChatMemberRepository::getAllMembers(bool orderByLastOnlineDesc) const {
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
-    const auto daoList = storage_->get_all<ChatMemberDAO>();
+
+    std::vector<ChatMemberDAO> daoList;
+    if (orderByLastOnlineDesc) {
+        daoList = storage_->get_all<ChatMemberDAO>(
+            sqlite_orm::order_by(&ChatMemberDAO::getLastOnlineAtAsUnix).desc()
+        );
+    } else {
+        daoList = storage_->get_all<ChatMemberDAO>();
+    }
+
     std::vector<ChatMemberModel> models;
     models.reserve(daoList.size());
     for (const auto& dao : daoList) {
@@ -74,33 +84,17 @@ boost::asio::awaitable<void> ChatMemberRepository::removeMember(boost::uuids::uu
     co_return;
 }
 
-boost::asio::awaitable<std::vector<ChatMemberModel>> ChatMemberRepository::getMembersByChatId(
-    boost::uuids::uuid chatId,
-    std::optional<std::chrono::system_clock::time_point> from)
-{
+boost::asio::awaitable<std::vector<ChatMemberModel>> ChatMemberRepository::getMembersByUsername(const std::string& username, bool orderByLastOnlineDesc) {
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
-    auto blob = UUIDConverter::toBlob(chatId);
-
-    auto condition = sqlite_orm::where(sqlite_orm::is_equal(&ChatMemberDAO::getChatIdAsBLOB, blob));
-    if (from.has_value()) {
-        auto unixFrom = TimePointConverter::toUnixSeconds(*from);
-        condition = condition && sqlite_orm::greater_or_equal(&ChatMemberDAO::getLastOnlineAtAsUnix, unixFrom);
+    auto condition = sqlite_orm::where(sqlite_orm::is_equal(&ChatMemberDAO::getUsername, username));
+    std::vector<ChatMemberDAO> daoList;
+    if (orderByLastOnlineDesc) {
+        daoList = storage_->get_all<ChatMemberDAO>(condition,
+            sqlite_orm::order_by(&ChatMemberDAO::getLastOnlineAtAsUnix).desc()
+        );
+    } else {
+        daoList = storage_->get_all<ChatMemberDAO>(condition);
     }
-
-    auto daoList = storage_->get_all<ChatMemberDAO>(condition);
-    std::vector<ChatMemberModel> models;
-    models.reserve(daoList.size());
-    for (const auto& dao : daoList) {
-        models.push_back(ChatMemberDAOConverter::convert(dao));
-    }
-    co_return models;
-}
-
-boost::asio::awaitable<std::vector<ChatMemberModel>> ChatMemberRepository::getMembersByUsername(const std::string& username) {
-    co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
-    auto daoList = storage_->get_all<ChatMemberDAO>(
-        sqlite_orm::where(sqlite_orm::is_equal(&ChatMemberDAO::getUsername, username))
-    );
     std::vector<ChatMemberModel> models;
     models.reserve(daoList.size());
     for (const auto& dao : daoList) {
