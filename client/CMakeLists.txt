@@ -115,7 +115,10 @@ add_executable(Morze main.cpp
         repositories/repositories/ChatMemberRepository.h
         exceptions/ConnectionProfileExceptions.h
         repositories/repositories/ConnectionProfileRepository.cpp
-        repositories/repositories/ConnectionProfileRepository.h)
+        repositories/repositories/ConnectionProfileRepository.h
+        exceptions/MessageExceptions.h
+        repositories/repositories/MessageRepository.cpp
+        repositories/repositories/MessageRepository.h)
 target_include_directories(Morze PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/Converters
@@ -156,6 +159,9 @@ if(BUILD_TESTS)
             repositories/repositories/ConnectionProfileRepository.cpp
             repositories/repositories/ConnectionProfileRepository.h
             tests/repository/TestConnectionProfileRepository.cpp
+            repositories/repositories/MessageRepository.cpp
+            repositories/repositories/MessageRepository.h
+            tests/repository/TestMessageRepository.cpp
     )
 
     add_executable(MorzeTests ${TEST_SOURCES})
