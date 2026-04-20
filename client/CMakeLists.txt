@@ -155,6 +155,7 @@ if(BUILD_TESTS)
             tests/TestMain.cpp
             repositories/repositories/ConnectionProfileRepository.cpp
             repositories/repositories/ConnectionProfileRepository.h
+            tests/repository/TestConnectionProfileRepository.cpp
     )
 
     add_executable(MorzeTests ${TEST_SOURCES})
