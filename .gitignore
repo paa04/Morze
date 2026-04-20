@@ -43,5 +43,7 @@
 */cmake-buid-debug/
 */.idea/
 *.bkp
-
 *.db
+.vscode
+build
+
