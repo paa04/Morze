@@ -32,6 +32,25 @@ public:
         , delivery_state_(delivery_state) {
         validateInvariants();
     }
+
+    MessageModel(const boost::uuids::uuid chat_id,
+               const boost::uuids::uuid sender_id,
+               const MessageDirection direction,
+               std::string content,
+               const std::chrono::system_clock::time_point created_at,
+               const DeliveryState delivery_state)
+    : chat_id_(chat_id)
+    , sender_id_(sender_id)
+    , direction_(direction)
+    , content_(std::move(content))
+    , created_at_(created_at)
+    , delivery_state_(delivery_state)
+    {
+        validateInvariants();
+        boost::uuids::random_generator gen;
+        message_id_ = gen();
+    }
+
     // Геттеры
     const boost::uuids::uuid& getMessageId() const { return message_id_; }
     std::vector<char> getMessageIdAsBLOB() const { return UUIDConverter::toBlob(message_id_); }

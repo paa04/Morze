@@ -24,6 +24,18 @@ public:
         validateInvariants();
     }
 
+    ConnectionProfileModel(std::string server_url,
+                         std::string stun_url,
+                         const std::chrono::system_clock::time_point updated_at)
+    : server_url_(std::move(server_url))
+    , stun_url_(std::move(stun_url))
+    , updated_at_(updated_at)
+    {
+        validateInvariants();
+        boost::uuids::random_generator gen;
+        id_ = gen();
+    }
+
     // Геттеры
     const boost::uuids::uuid& getId() const { return id_; }
     std::vector<char> getIdAsBLOB() const { return UUIDConverter::toBlob(id_); }

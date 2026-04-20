@@ -31,6 +31,22 @@ public:
         last_message_number_ = last_message_number;
     }
 
+    ChatModel(const boost::uuids::uuid room_id,
+            const ChatType type,
+            std::string title,
+            const std::chrono::system_clock::time_point created_at,
+            const int64_t last_message_number)
+    : room_id_(room_id)
+    , type_(type)
+    , title_(std::move(title))
+    , created_at_(created_at)
+    , last_message_number_(last_message_number)
+    {
+        boost::uuids::random_generator generator;
+        chat_id_ = generator();
+        if (title_.empty()) throw std::invalid_argument("title is required");
+    }
+
     // Геттеры
     const boost::uuids::uuid& getChatId() const { return chat_id_; }
     std::vector<char> getChatIdAsBLOB() const { return UUIDConverter::toBlob(chat_id_); }

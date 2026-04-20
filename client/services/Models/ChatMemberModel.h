@@ -25,6 +25,18 @@ public:
         last_online_at_ = last_online_at;
     }
 
+    ChatMemberModel(const boost::uuids::uuid chat_id,
+                  std::string username,
+                  const std::optional<std::chrono::system_clock::time_point> last_online_at)
+        : chat_id_(chat_id)
+        , username_(std::move(username))
+        , last_online_at_(last_online_at)
+    {
+        if (username_.empty()) throw std::invalid_argument("username is required");
+        boost::uuids::random_generator gen;
+        id_ = gen();
+    }
+
     // Геттеры
     const boost::uuids::uuid& getId() const { return id_; }
     std::vector<char> getIdAsBLOB() const { return UUIDConverter::toBlob(id_); }
