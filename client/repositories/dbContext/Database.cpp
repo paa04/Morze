@@ -1,9 +1,9 @@
 #include "Database.h"
 #include <iostream>
 #include <sqlite3.h>
-Database::Database(const std::string& dbPath)
-    : dbPath_(dbPath)
-{
+
+Database::Database(const std::string &dbPath)
+    : dbPath_(dbPath) {
     storage_ = std::make_shared<StorageType>(DBConfiguration::createStorage(dbPath));
 }
 
@@ -13,8 +13,8 @@ Database::~Database() {
     }
 }
 
-bool Database::execRaw(const std::string& sql) {
-    char* errMsg = nullptr;
+bool Database::execRaw(const std::string &sql) {
+    char *errMsg = nullptr;
     int rc = sqlite3_exec(raw_db_, sql.c_str(), nullptr, nullptr, &errMsg);
     if (rc != SQLITE_OK) {
         std::cerr << "SQL error: " << (errMsg ? errMsg : "unknown") << std::endl;
@@ -24,8 +24,8 @@ bool Database::execRaw(const std::string& sql) {
     return true;
 }
 
-int Database::querySingleInt(const std::string& sql) {
-    sqlite3_stmt* stmt = nullptr;
+int Database::querySingleInt(const std::string &sql) {
+    sqlite3_stmt *stmt = nullptr;
     int rc = sqlite3_prepare_v2(raw_db_, sql.c_str(), -1, &stmt, nullptr);
     if (rc != SQLITE_OK) {
         std::cerr << "Failed to prepare statement: " << sqlite3_errmsg(raw_db_) << std::endl;
@@ -68,13 +68,13 @@ void Database::setSchemaVersion(int version) {
     execRaw("UPDATE schema_version SET version = " + std::to_string(version));
 }
 
-bool Database::applyMigration(int targetVersion, const std::string& sql) {
+bool Database::applyMigration(int targetVersion, const std::string &sql) {
     try {
         if (!execRaw(sql))
             return false;
         setSchemaVersion(targetVersion);
         return true;
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         std::cerr << "Migration to version " << targetVersion << " failed: " << e.what() << std::endl;
         return false;
     }
@@ -82,7 +82,7 @@ bool Database::applyMigration(int targetVersion, const std::string& sql) {
 
 bool Database::runMigrations() {
     int currentVersion = getCurrentSchemaVersion();
-    const int TARGET_VERSION = 5;
+    const int TARGET_VERSION = 6;
     if (currentVersion >= TARGET_VERSION) {
         return true;
     }
@@ -169,6 +169,24 @@ bool Database::runMigrations() {
     // Миграция 005 -> 5 (уже учтена в FOREIGN KEY с ON DELETE CASCADE)
     if (currentVersion < 5) {
         setSchemaVersion(5);
+    }
+
+    if (currentVersion < 6) {
+        std::string sql = R"(
+        CREATE TABLE IF NOT EXISTS users (
+            login TEXT PRIMARY KEY,
+            password_hash TEXT NOT NULL,
+            member_id BLOB NOT NULL UNIQUE,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY(member_id) REFERENCES chat_members(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_users_member_id ON users(member_id);
+    )";
+        if (!applyMigration(6, sql)) {
+            storage_->rollback();
+            return false;
+        }
     }
 
     storage_->commit();

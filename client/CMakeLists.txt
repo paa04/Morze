@@ -18,6 +18,13 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(sqlite_orm)
 
 FetchContent_Declare(
+        libdatachannel
+        GIT_REPOSITORY https://github.com/paullouisageneau/libdatachannel.git
+        GIT_TAG v0.24.2
+)
+FetchContent_MakeAvailable(libdatachannel)
+
+FetchContent_Declare(
         cpm
         GIT_REPOSITORY https://github.com/cpm-cmake/CPM.cmake
         GIT_TAG v0.42.1
@@ -58,6 +65,7 @@ add_boost_library(detail            https://github.com/boostorg/detail          
 add_boost_library(system            https://github.com/boostorg/system          boost-1.90.0)
 add_boost_library(uuid              https://github.com/boostorg/uuid            boost-1.90.0)
 add_boost_library(asio              https://github.com/boostorg/asio            boost-1.90.0)
+add_boost_library(beast             https://github.com/boostorg/beast           boost-1.90.0)
 
 FetchContent_Declare(
         json
@@ -118,7 +126,16 @@ add_executable(Morze main.cpp
         repositories/repositories/ConnectionProfileRepository.h
         exceptions/MessageExceptions.h
         repositories/repositories/MessageRepository.cpp
-        repositories/repositories/MessageRepository.h)
+        repositories/repositories/MessageRepository.h
+        services/Models/UserModel.h
+        services/Models/UserModel.h
+        repositories/DAO/UserDAO.h
+        repositories/DAO/UserDAO.h
+        services/Models/UserModel.h
+        repositories/DAO/Converters/UserDAOConverter.h
+        exceptions/UserExceptions.h
+        repositories/repositories/UserRepository.cpp
+        repositories/repositories/UserRepository.h)
 target_include_directories(Morze PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/Converters
@@ -131,7 +148,15 @@ target_include_directories(Morze PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/exceptions
         )
 
-target_link_libraries(Morze PRIVATE sqlite_orm::sqlite_orm sqlite3 Boost::uuid Boost::asio nlohmann_json::nlohmann_json)
+target_link_libraries(Morze PRIVATE
+        sqlite_orm::sqlite_orm
+        sqlite3
+        Boost::uuid
+        Boost::asio
+        nlohmann_json::nlohmann_json
+        Boost::beast
+        datachannel
+)
 
 if(WIN32)
     target_link_libraries(Morze PRIVATE ws2_32)
@@ -186,8 +211,10 @@ if(BUILD_TESTS)
             sqlite3
             Boost::uuid
             Boost::asio
+            Boost::beast
             nlohmann_json::nlohmann_json
             doctest::doctest
+            datachannel
     )
 
     # Включаем CTest для интеграции с IDE
