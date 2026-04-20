@@ -41,3 +41,7 @@
 *.dwo
 
 *.bkp
+.idea
+.vscode
+build
+cmake-build-debug
