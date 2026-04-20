@@ -47,11 +47,11 @@ public:
     void setMemberIdFromString(const std::string& str) { member_id_ = UUIDConverter::fromString(str); }
 
     void setCreatedAt(std::chrono::system_clock::time_point tp) { created_at_ = tp; }
-    void setCreatedAtFromUnix(std::int64_t unix) { created_at_ = TimePointConverter::fromUnixSeconds(unix); }
+    void setCreatedAtFromUnix(std::int64_t tp) { created_at_ = TimePointConverter::fromUnixSeconds(tp); }
     void setCreatedAtFromString(const std::string& iso) { created_at_ = TimePointConverter::fromIsoString(iso); }
 
     void setUpdatedAt(std::chrono::system_clock::time_point tp) { updated_at_ = tp; }
-    void setUpdatedAtFromUnix(std::int64_t unix) { updated_at_ = TimePointConverter::fromUnixSeconds(unix); }
+    void setUpdatedAtFromUnix(std::int64_t tp) { updated_at_ = TimePointConverter::fromUnixSeconds(tp); }
     void setUpdatedAtFromString(const std::string& iso) { updated_at_ = TimePointConverter::fromIsoString(iso); }
 
 private:

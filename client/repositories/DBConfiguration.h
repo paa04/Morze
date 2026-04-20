@@ -27,14 +27,11 @@ public:
                                                    &ChatDAO::setLastMessageNumber)
                             ),
                             make_table("chat_members",
-                                       make_column("id", &ChatMemberDAO::getIdAsBLOB, &ChatMemberDAO::setIdFromBLOB,
-                                                   primary_key()),
-                                       make_column("chat_id", &ChatMemberDAO::getChatIdAsBLOB,
-                                                   &ChatMemberDAO::setChatIdFromBLOB),
-                                       make_column("username", &ChatMemberDAO::getUsername,
-                                                   &ChatMemberDAO::setUsername),
-                                       make_column("last_online_at", &ChatMemberDAO::getLastOnlineAtAsUnix,
-                                                   &ChatMemberDAO::setLastOnlineAtFromUnix)
+                                make_column("chat_id", &ChatMemberDAO::getChatIdAsBLOB, &ChatMemberDAO::setChatIdFromBLOB),
+                                make_column("user_id", &ChatMemberDAO::getUserIdAsBLOB, &ChatMemberDAO::setUserIdFromBLOB),
+                                make_column("username", &ChatMemberDAO::getUsername, &ChatMemberDAO::setUsername),
+                                make_column("last_online_at", &ChatMemberDAO::getLastOnlineAtAsUnix, &ChatMemberDAO::setLastOnlineAtFromUnix),
+                                primary_key(&ChatMemberDAO::getChatId, &ChatMemberDAO::getUserId)
                             ),
                             make_table("messages",
                                        make_column("message_id", &MessageDAO::getMessageIdAsBLOB,
@@ -71,8 +68,7 @@ public:
                                        make_column("created_at", &UserDAO::getCreatedAtAsUnix,
                                                    &UserDAO::setCreatedAtFromUnix),
                                        make_column("updated_at", &UserDAO::getUpdatedAtAsUnix,
-                                                   &UserDAO::setUpdatedAtFromUnix),
-                                       foreign_key(&UserDAO::getMemberId).references(&ChatMemberDAO::getId)
+                                                   &UserDAO::setUpdatedAtFromUnix)
                             )
         );
     }

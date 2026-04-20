@@ -112,14 +112,15 @@ bool Database::runMigrations() {
     // Миграция 002 -> 2
     if (currentVersion < 2) {
         std::string sql = R"(
-            CREATE TABLE IF NOT EXISTS chat_members (
-                id BLOB PRIMARY KEY,
-                chat_id BLOB NOT NULL,
-                username TEXT NOT NULL,
-                last_online_at INTEGER NULL,
-                FOREIGN KEY(chat_id) REFERENCES chats(chat_id) ON DELETE CASCADE
-            );
-            CREATE INDEX IF NOT EXISTS idx_chat_members_chat_id ON chat_members(chat_id);
+        CREATE TABLE IF NOT EXISTS chat_members (
+            chat_id BLOB NOT NULL,
+            user_id BLOB NOT NULL,
+            username TEXT NOT NULL,
+            last_online_at INTEGER NULL,
+            PRIMARY KEY (chat_id, user_id),
+            FOREIGN KEY(chat_id) REFERENCES chats(chat_id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_chat_members_user_id ON chat_members(user_id);
         )";
         if (!applyMigration(2, sql)) {
             storage_->rollback();
@@ -139,7 +140,7 @@ bool Database::runMigrations() {
                 created_at INTEGER NOT NULL,
                 delivery_state TEXT NOT NULL,
                 FOREIGN KEY(chat_id) REFERENCES chats(chat_id) ON DELETE CASCADE,
-                FOREIGN KEY(sender_id) REFERENCES chat_members(id) ON DELETE SET NULL
+                FOREIGN KEY(sender_id) REFERENCES chat_members(user_id) ON DELETE SET NULL
             );
             CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
             CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
@@ -178,8 +179,7 @@ bool Database::runMigrations() {
             password_hash TEXT NOT NULL,
             member_id BLOB NOT NULL UNIQUE,
             created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL,
-            FOREIGN KEY(member_id) REFERENCES chat_members(id) ON DELETE CASCADE
+            updated_at INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_users_member_id ON users(member_id);
     )";

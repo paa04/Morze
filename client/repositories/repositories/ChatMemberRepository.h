@@ -20,19 +20,16 @@ public:
     explicit ChatMemberRepository(boost::asio::io_context &ioc, std::shared_ptr<Storage> storage);
 
     // CRUD
-    boost::asio::awaitable<std::vector<ChatMemberModel> > getAllMembers(bool orderByLastOnlineDesc = true) const;
+    boost::asio::awaitable<std::vector<ChatMemberModel>> getAllMembers(bool orderByLastOnlineDesc = true) const;
 
-    boost::asio::awaitable<ChatMemberModel> getMemberById(boost::uuids::uuid id);
+    // Возвращает всех участников с заданным member_id (может быть несколько в разных чатах)
+    boost::asio::awaitable<std::vector<ChatMemberModel>> getMembersByUserId(boost::uuids::uuid userId);
 
     boost::asio::awaitable<void> addMember(const ChatMemberDAO &member);
 
     boost::asio::awaitable<void> updateMember(const ChatMemberDAO &member);
 
-    boost::asio::awaitable<void> removeMember(boost::uuids::uuid id);
-
-    // Специфичные выборки
-    boost::asio::awaitable<std::vector<ChatMemberModel> > getMembersByUsername(
-        const std::string &username, bool orderByLastOnlineDesc = true);
+    boost::asio::awaitable<void> removeMember(boost::uuids::uuid chatId, boost::uuids::uuid userId);
 
 private:
     boost::asio::io_context &ioc_;

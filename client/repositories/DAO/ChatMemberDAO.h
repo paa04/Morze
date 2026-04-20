@@ -14,25 +14,22 @@ class ChatMemberDAO {
 public:
     ChatMemberDAO() = default;
 
-    ChatMemberDAO(const boost::uuids::uuid id,
-                  const boost::uuids::uuid chat_id,
+    ChatMemberDAO(boost::uuids::uuid chat_id,
+                  boost::uuids::uuid user_id,
                   std::string username,
-                  const std::optional<std::chrono::system_clock::time_point> last_online_at) {
-        if (username.empty()) throw std::invalid_argument("username is required");
-        id_ = id;
-        chat_id_ = chat_id;
-        username_ = std::move(username);
-        last_online_at_ = last_online_at;
+                  std::optional<std::chrono::system_clock::time_point> last_online_at)
+        : chat_id_(chat_id), user_id_(user_id), username_(std::move(username)), last_online_at_(last_online_at) {
+        if (username_.empty()) throw std::invalid_argument("username is required");
     }
 
     // Геттеры
-    const boost::uuids::uuid& getId() const { return id_; }
-    std::vector<char> getIdAsBLOB() const { return UUIDConverter::toBlob(id_); }
-    std::string getIdAsString() const { return UUIDConverter::toString(id_); }
-
     const boost::uuids::uuid& getChatId() const { return chat_id_; }
     std::vector<char> getChatIdAsBLOB() const { return UUIDConverter::toBlob(chat_id_); }
     std::string getChatIdAsString() const { return UUIDConverter::toString(chat_id_); }
+
+    const boost::uuids::uuid& getUserId() const { return user_id_; }
+    std::vector<char> getUserIdAsBLOB() const { return UUIDConverter::toBlob(user_id_); }
+    std::string getUserIdAsString() const { return UUIDConverter::toString(user_id_); }
 
     const std::string& getUsername() const { return username_; }
 
@@ -49,38 +46,32 @@ public:
     }
 
     // Сеттеры
-    void setId(const boost::uuids::uuid id) { id_ = id; }
-    void setIdFromBLOB(const std::vector<char>& blob) { id_ = UUIDConverter::fromBlob(blob); }
-    void setIdFromString(const std::string& str) { id_ = UUIDConverter::fromString(str); }
-
-    void setChatId(const boost::uuids::uuid chat_id) { chat_id_ = chat_id; }
+    void setChatId(boost::uuids::uuid id) { chat_id_ = id; }
     void setChatIdFromBLOB(const std::vector<char>& blob) { chat_id_ = UUIDConverter::fromBlob(blob); }
     void setChatIdFromString(const std::string& str) { chat_id_ = UUIDConverter::fromString(str); }
+
+    void setUserId(boost::uuids::uuid id) { user_id_ = id; }
+    void setUserIdFromBLOB(const std::vector<char>& blob) { user_id_ = UUIDConverter::fromBlob(blob); }
+    void setUserIdFromString(const std::string& str) { user_id_ = UUIDConverter::fromString(str); }
 
     void setUsername(std::string username) {
         if (username.empty()) throw std::invalid_argument("username cannot be empty");
         username_ = std::move(username);
     }
 
-    void setLastOnlineAt(const std::optional<std::chrono::system_clock::time_point> last_online_at) {
-        last_online_at_ = last_online_at;
-    }
+    void setLastOnlineAt(std::optional<std::chrono::system_clock::time_point> tp) { last_online_at_ = tp; }
     void setLastOnlineAtFromUnix(const std::optional<std::int64_t>& sec) {
-        if (sec.has_value())
-            last_online_at_ = TimePointConverter::fromUnixSeconds(*sec);
-        else
-            last_online_at_ = std::nullopt;
+        if (sec.has_value()) last_online_at_ = TimePointConverter::fromUnixSeconds(*sec);
+        else last_online_at_ = std::nullopt;
     }
     void setLastOnlineAtFromString(const std::optional<std::string>& iso) {
-        if (iso.has_value())
-            last_online_at_ = TimePointConverter::fromIsoString(*iso);
-        else
-            last_online_at_ = std::nullopt;
+        if (iso.has_value()) last_online_at_ = TimePointConverter::fromIsoString(*iso);
+        else last_online_at_ = std::nullopt;
     }
 
 private:
-    boost::uuids::uuid id_;
     boost::uuids::uuid chat_id_;
+    boost::uuids::uuid user_id_;
     std::string username_;
     std::optional<std::chrono::system_clock::time_point> last_online_at_;
 };

@@ -12,7 +12,7 @@ class ChatMemberDAOConverter {
 public:
     static ChatMemberModel convert(const ChatMemberDAO &dao) {
         return ChatMemberModel{
-            dao.getId(),
+            dao.getUserId(),
             dao.getChatId(),
             dao.getUsername(),
             dao.getLastOnlineAt()
@@ -21,7 +21,7 @@ public:
 
     static ChatMemberDAO convert(const ChatMemberModel &model) {
         return ChatMemberDAO{
-            model.getId(),
+            model.getUserId(),
             model.getChatId(),
             model.getUsername(),
             model.getLastOnlineAt()

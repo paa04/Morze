@@ -67,12 +67,12 @@ add_boost_library(uuid              https://github.com/boostorg/uuid            
 add_boost_library(asio              https://github.com/boostorg/asio            boost-1.90.0)
 add_boost_library(beast             https://github.com/boostorg/beast           boost-1.90.0)
 
-FetchContent_Declare(
-        json
-        GIT_REPOSITORY https://github.com/nlohmann/json.git
-        GIT_TAG v3.11.3
-)
-FetchContent_MakeAvailable(json)
+#FetchContent_Declare(
+#        json
+#        GIT_REPOSITORY https://github.com/nlohmann/json.git
+#        GIT_TAG v3.11.3
+#)
+#FetchContent_MakeAvailable(json)
 
 target_link_libraries(Boost_uuid INTERFACE
         Boost_config Boost_core Boost_assert Boost_throw_exception
@@ -135,7 +135,14 @@ add_executable(Morze main.cpp
         repositories/DAO/Converters/UserDAOConverter.h
         exceptions/UserExceptions.h
         repositories/repositories/UserRepository.cpp
-        repositories/repositories/UserRepository.h)
+        repositories/repositories/UserRepository.h
+        services/services/ChatService.cpp
+        services/services/ChatService.h
+        services/services/ChatMemberService.cpp
+        services/services/ChatMemberService.h
+        services/services/MessageService.cpp
+        services/services/MessageService.h
+        services/services/ChatMemberService.h)
 target_include_directories(Morze PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/Converters
@@ -153,7 +160,7 @@ target_link_libraries(Morze PRIVATE
         sqlite3
         Boost::uuid
         Boost::asio
-        nlohmann_json::nlohmann_json
+        nlohmann_json#::nlohmann_json
         Boost::beast
         datachannel
 )
@@ -187,6 +194,14 @@ if(BUILD_TESTS)
             repositories/repositories/MessageRepository.cpp
             repositories/repositories/MessageRepository.h
             tests/repository/TestMessageRepository.cpp
+            services/services/ChatService.cpp
+            services/services/ChatService.h
+            services/services/ChatMemberService.cpp
+            services/services/ChatMemberService.h
+            services/services/MessageService.cpp
+            services/services/MessageService.h
+            services/services/ConnectionProfileService.cpp
+            services/services/ConnectionProfileService.h
     )
 
     add_executable(MorzeTests ${TEST_SOURCES})
