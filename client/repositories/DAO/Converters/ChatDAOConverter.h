@@ -7,12 +7,11 @@
 #include "ChatDAO.h"
 #include "ChatModel.h"
 
-
 class ChatDAOConverter {
 public:
     static ChatModel convert(const ChatDAO &dao) {
         return ChatModel{
-            dao.getChatId(),
+            dao.getId(),
             dao.getRoomId(),
             dao.getType(),
             dao.getTitle(),
@@ -23,7 +22,7 @@ public:
 
     static ChatDAO convert(const ChatModel &model) {
         return ChatDAO{
-            model.getChatId(),
+            model.getId(),
             model.getRoomId(),
             model.getType(),
             model.getTitle(),
