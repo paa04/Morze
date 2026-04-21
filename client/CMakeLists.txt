@@ -158,7 +158,9 @@ add_executable(Morze main.cpp
         services/services/UserService.cpp
         services/services/UserService.h
         services/services/SignalingService.cpp
-        services/services/SignalingService.h)
+        services/services/SignalingService.h
+        services/services/WebRTCService.cpp
+        services/services/WebRTCService.h)
 
 target_include_directories(Morze PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
@@ -228,6 +230,8 @@ if(BUILD_TESTS)
             services/services/UserService.h
             services/services/SignalingService.cpp
             services/services/SignalingService.h
+            services/services/WebRTCService.cpp
+            services/services/WebRTCService.h
     )
 
     add_executable(MorzeTests ${TEST_SOURCES})
