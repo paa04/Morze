@@ -1,4 +1,7 @@
 #include "UserRepository.h"
+
+#include <boost/asio/io_context.hpp>
+
 #include "UserDAOConverter.h"
 #include "UUIDConverter.h"
 #include "TimePointConverter.h"

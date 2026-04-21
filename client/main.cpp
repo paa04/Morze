@@ -46,9 +46,10 @@ int main(int argc, char* argv[]) {
             room_id,
             ChatType::Direct,
             "Test Chat",
-            std::chrono::system_clock::now()
+            std::chrono::system_clock::now(),
+            0
         );
-        storage->insert(new_chat);
+        storage->replace(new_chat);
         std::cout << "Inserted test chat with ID: " << UUIDConverter::toString(chat_id) << "\n";
 
         // 4. Читаем все чаты и выводим
@@ -65,20 +66,20 @@ int main(int argc, char* argv[]) {
         MessageDAO new_msg(
             msg_id,
             chat_id,
-            "Alice",
+            uuid_gen(),
             MessageDirection::Outgoing,
             "Hello, world!",
             std::chrono::system_clock::now(),
             DeliveryState::Sent
         );
-        storage->insert(new_msg);
+        storage->replace(new_msg);
 
         auto blob_chat_id = UUIDConverter::toBlob(chat_id);
         auto messages = storage->get_all<MessageDAO>(sqlite_orm::where(sqlite_orm::c(&MessageDAO::getChatIdAsBLOB) == blob_chat_id));
         std::cout << "\nMessages in chat:\n";
         for (const auto& m : messages) {
             std::cout << "  [" << m.getCreatedAtAsString() << "] "
-                      << m.getSenderName() << ": " << m.getContent()
+                      << m.getSenderIdAsString() << ": " << m.getContent()
                       << " (" << m.getDeliveryStateAsString() << ")\n";
         }
 

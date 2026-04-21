@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 4.1)
 project(Morze)
 include(FetchContent)
-
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+#set(CMAKE_AUTOUIC ON)
 set(CMAKE_CXX_STANDARD 23)
+
+set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/qt6" CACHE PATH "Qt6 prefix path")
 
 FetchContent_Declare(
         sqlite3
@@ -17,13 +22,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(sqlite_orm)
 
+set(NO_QT ON CACHE BOOL "Disable Qt support in libdatachannel" FORCE)
+set(CMAKE_AUTOMOC OFF)
 FetchContent_Declare(
         libdatachannel
         GIT_REPOSITORY https://github.com/paullouisageneau/libdatachannel.git
         GIT_TAG v0.24.2
 )
 FetchContent_MakeAvailable(libdatachannel)
-
+set(CMAKE_AUTOMOC ON)
 FetchContent_Declare(
         cpm
         GIT_REPOSITORY https://github.com/cpm-cmake/CPM.cmake
@@ -92,6 +99,11 @@ target_compile_definitions(Boost_asio INTERFACE BOOST_ASIO_HAS_CO_AWAIT)
 
 
 
+find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets)
+#message(STATUS "Qt version: ${QT_VERSION_MAJOR}")
+#message(STATUS "Qt Core include dirs: ${Qt${QT_VERSION_MAJOR}_INCLUDE_DIRS}")
+#message(STATUS "Qt Core libraries: ${Qt${QT_VERSION_MAJOR}_LIBRARIES}")
+
 add_executable(Morze main.cpp
         repositories/dbContext/Database.cpp
         repositories/dbContext/Database.h
@@ -144,7 +156,10 @@ add_executable(Morze main.cpp
         services/services/MessageService.h
         services/services/ChatMemberService.h
         services/services/UserService.cpp
-        services/services/UserService.h)
+        services/services/UserService.h
+        services/services/SignalingService.cpp
+        services/services/SignalingService.h)
+
 target_include_directories(Morze PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/Converters
@@ -155,6 +170,7 @@ target_include_directories(Morze PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/services/Models
         ${CMAKE_CURRENT_SOURCE_DIR}/services
         ${CMAKE_CURRENT_SOURCE_DIR}/exceptions
+        ${Qt6_INCLUDE_DIRS}
         )
 
 target_link_libraries(Morze PRIVATE
@@ -165,6 +181,9 @@ target_link_libraries(Morze PRIVATE
         nlohmann_json#::nlohmann_json
         Boost::beast
         datachannel
+        Qt6::Core
+        Qt6::Network
+        Qt6::WebSockets
 )
 
 if(WIN32)
@@ -196,6 +215,7 @@ if(BUILD_TESTS)
             repositories/repositories/MessageRepository.cpp
             repositories/repositories/MessageRepository.h
             tests/repository/TestMessageRepository.cpp
+            repositories/repositories/UserRepository.cpp
             services/services/ChatService.cpp
             services/services/ChatService.h
             services/services/ChatMemberService.cpp
@@ -206,6 +226,8 @@ if(BUILD_TESTS)
             services/services/ConnectionProfileService.h
             services/services/UserService.cpp
             services/services/UserService.h
+            services/services/SignalingService.cpp
+            services/services/SignalingService.h
     )
 
     add_executable(MorzeTests ${TEST_SOURCES})
@@ -222,6 +244,7 @@ if(BUILD_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/services/Models
             ${CMAKE_CURRENT_SOURCE_DIR}/services
             ${CMAKE_CURRENT_SOURCE_DIR}/exceptions
+            ${Qt6_INCLUDE_DIRS}
     )
 
     # Линкуем всё то же, что и основное приложение + doctest
@@ -234,6 +257,9 @@ if(BUILD_TESTS)
             nlohmann_json::nlohmann_json
             doctest::doctest
             datachannel
+            Qt6::Core
+            Qt6::Network
+            Qt6::WebSockets
     )
 
     # Включаем CTest для интеграции с IDE
