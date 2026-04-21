@@ -15,11 +15,20 @@ boost::asio::awaitable<std::vector<ChatMemberModel>> ChatMemberService::getAllMe
     }
 }
 
-boost::asio::awaitable<std::vector<ChatMemberModel>> ChatMemberService::getMembersByUserId(boost::uuids::uuid userId) const {
+boost::asio::awaitable<ChatMemberModel> ChatMemberService::getMemberById(boost::uuids::uuid memberId) const {
     try {
-        co_return co_await repo_->getMembersByUserId(userId);
+        co_return co_await repo_->getMemberById(memberId);
     } catch (const std::exception& e) {
-        std::cerr << "[ChatMemberService] getMembersByUserId failed: " << e.what() << '\n';
+        std::cerr << "[ChatMemberService] getMemberById failed: " << e.what() << '\n';
+        throw;
+    }
+}
+
+boost::asio::awaitable<std::vector<ChatMemberModel>> ChatMemberService::getMembersByChatId(boost::uuids::uuid chatId) const {
+    try {
+        co_return co_await repo_->getMembersByChatId(chatId);
+    } catch (const std::exception& e) {
+        std::cerr << "[ChatMemberService] getMembersByChatId failed: " << e.what() << '\n';
         throw;
     }
 }
@@ -44,9 +53,9 @@ boost::asio::awaitable<void> ChatMemberService::updateMember(const ChatMemberMod
     }
 }
 
-boost::asio::awaitable<void> ChatMemberService::removeMember(boost::uuids::uuid chatId, boost::uuids::uuid userId) const {
+boost::asio::awaitable<void> ChatMemberService::removeMember(boost::uuids::uuid memberId) const {
     try {
-        co_await repo_->removeMember(chatId, userId);
+        co_await repo_->removeMember(memberId);
     } catch (const std::exception& e) {
         std::cerr << "[ChatMemberService] removeMember failed: " << e.what() << '\n';
         throw;

@@ -1,7 +1,3 @@
-//
-// Created by ivan on 18.04.2026.
-//
-
 #ifndef MORZE_CHATMEMBERREPOSITORY_H
 #define MORZE_CHATMEMBERREPOSITORY_H
 
@@ -19,17 +15,15 @@ public:
 
     explicit ChatMemberRepository(boost::asio::io_context &ioc, std::shared_ptr<Storage> storage);
 
-    // CRUD
+    // CRUD участников
     boost::asio::awaitable<std::vector<ChatMemberModel>> getAllMembers(bool orderByLastOnlineDesc = true) const;
-
-    // Возвращает всех участников с заданным member_id (может быть несколько в разных чатах)
-    boost::asio::awaitable<std::vector<ChatMemberModel>> getMembersByUserId(boost::uuids::uuid userId);
-
+    boost::asio::awaitable<ChatMemberModel> getMemberById(boost::uuids::uuid id);
     boost::asio::awaitable<void> addMember(const ChatMemberDAO &member);
-
     boost::asio::awaitable<void> updateMember(const ChatMemberDAO &member);
+    boost::asio::awaitable<void> removeMember(boost::uuids::uuid id);
 
-    boost::asio::awaitable<void> removeMember(boost::uuids::uuid chatId, boost::uuids::uuid userId);
+    // Участники конкретного чата
+    boost::asio::awaitable<std::vector<ChatMemberModel>> getMembersByChatId(boost::uuids::uuid chatId);
 
 private:
     boost::asio::io_context &ioc_;

@@ -16,14 +16,14 @@ class MessageDAO {
 public:
     MessageDAO() = default;
 
-    MessageDAO(const boost::uuids::uuid message_id,
+    MessageDAO(const boost::uuids::uuid id,
                const boost::uuids::uuid chat_id,
                const boost::uuids::uuid sender_id,
                const MessageDirection direction,
                std::string content,
                const std::chrono::system_clock::time_point created_at,
                const DeliveryState delivery_state)
-        : message_id_(message_id)
+        : id_(id)
         , chat_id_(chat_id)
         , sender_id_(sender_id)
         , direction_(direction)
@@ -34,9 +34,9 @@ public:
     }
 
     // Геттеры
-    const boost::uuids::uuid& getMessageId() const { return message_id_; }
-    std::vector<char> getMessageIdAsBLOB() const { return UUIDConverter::toBlob(message_id_); }
-    std::string getMessageIdAsString() const { return UUIDConverter::toString(message_id_); }
+    const boost::uuids::uuid& getId() const { return id_; }
+    std::vector<char> getIdAsBLOB() const { return UUIDConverter::toBlob(id_); }
+    std::string getIdAsString() const { return UUIDConverter::toString(id_); }
 
     const boost::uuids::uuid& getChatId() const { return chat_id_; }
     std::vector<char> getChatIdAsBLOB() const { return UUIDConverter::toBlob(chat_id_); }
@@ -59,9 +59,9 @@ public:
     std::string getDeliveryStateAsString() const { return DeliveryStateConverter::toString(delivery_state_); }
 
     // Сеттеры
-    void setMessageId(const boost::uuids::uuid message_id) { message_id_ = message_id; }
-    void setMessageIdFromBLOB(const std::vector<char>& blob) { message_id_ = UUIDConverter::fromBlob(blob); }
-    void setMessageIdFromString(const std::string& str) { message_id_ = UUIDConverter::fromString(str); }
+    void setId(const boost::uuids::uuid message_id) { id_ = message_id; }
+    void setIdFromBLOB(const std::vector<char>& blob) { id_ = UUIDConverter::fromBlob(blob); }
+    void setIdFromString(const std::string& str) { id_ = UUIDConverter::fromString(str); }
 
     void setChatId(const boost::uuids::uuid chat_id) { chat_id_ = chat_id; }
     void setChatIdFromBLOB(const std::vector<char>& blob) { chat_id_ = UUIDConverter::fromBlob(blob); }
@@ -87,7 +87,7 @@ public:
     void setDeliveryStateFromString(const std::string& str) { delivery_state_ = DeliveryStateConverter::fromString(str); }
 
 private:
-    boost::uuids::uuid message_id_;
+    boost::uuids::uuid id_;
     boost::uuids::uuid chat_id_;
     boost::uuids::uuid sender_id_;
     MessageDirection direction_ = MessageDirection::Outgoing;

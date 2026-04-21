@@ -142,7 +142,9 @@ add_executable(Morze main.cpp
         services/services/ChatMemberService.h
         services/services/MessageService.cpp
         services/services/MessageService.h
-        services/services/ChatMemberService.h)
+        services/services/ChatMemberService.h
+        services/services/UserService.cpp
+        services/services/UserService.h)
 target_include_directories(Morze PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/Converters
@@ -202,6 +204,8 @@ if(BUILD_TESTS)
             services/services/MessageService.h
             services/services/ConnectionProfileService.cpp
             services/services/ConnectionProfileService.h
+            services/services/UserService.cpp
+            services/services/UserService.h
     )
 
     add_executable(MorzeTests ${TEST_SOURCES})

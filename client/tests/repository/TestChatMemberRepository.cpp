@@ -13,6 +13,7 @@
 #include "ChatMemberDAOConverter.h"
 #include "ChatMemberDAO.h"
 #include "ChatDAO.h"
+#include "ChatMemberRelationDAO.h"
 #include "DBConfiguration.h"
 #include "TimePointConverter.h"
 
@@ -61,37 +62,18 @@ TEST_CASE("ChatMemberRepository") {
     ChatMemberRepository repo(ioc, storage);
     boost::uuids::random_generator uuid_gen;
 
-    // Фиктивные чаты для внешнего ключа
-    boost::uuids::uuid dummy_chat_id = uuid_gen();
-    boost::uuids::uuid dummy_chat_id_2 = uuid_gen();
-    ChatDAO dummy_chat(dummy_chat_id, uuid_gen(), ChatType::Direct, "dummy",
-                       std::chrono::system_clock::now(), 0);
-    storage->replace(dummy_chat);
-    ChatDAO dummy_chat_2(dummy_chat_id_2, uuid_gen(), ChatType::Direct, "dummy2",
-                         std::chrono::system_clock::now(), 0);
-    storage->replace(dummy_chat_2);
-
-    // Вспомогательная функция для создания тестового участника
-    // Принимает username, chat_id, user_id (если не указан — генерируется новый), и last_online
-    auto create_test_member = [&](
-        std::string username,
-        boost::uuids::uuid chat_id,
-        std::optional<boost::uuids::uuid> user_id = std::nullopt,
-        std::optional<std::chrono::system_clock::time_point> last_online = std::nullopt)
+    // Вспомогательная функция для создания участника
+    auto create_test_member = [&](std::string username = "test_user",
+                                  std::optional<std::chrono::system_clock::time_point> last_online = std::nullopt)
         -> ChatMemberModel {
-        auto uid = user_id.value_or(uuid_gen());
-        return ChatMemberModel(
-            chat_id,
-            uid,
-            std::move(username),
-            last_online
-        );
+        return ChatMemberModel(std::move(username), last_online);
     };
 
     // Очищаем таблицы перед каждым тестом
     auto clear_tables = [&]() {
+        storage->remove_all<ChatMemberRelationDAO>();
         storage->remove_all<ChatMemberDAO>();
-        // Чат не удаляем, он нужен для FK
+        storage->remove_all<ChatDAO>();
     };
     clear_tables();
 
@@ -99,9 +81,9 @@ TEST_CASE("ChatMemberRepository") {
         using namespace std::chrono_literals;
         auto now = std::chrono::system_clock::now();
 
-        auto m1 = create_test_member("alice", dummy_chat_id, std::nullopt, now - 10s);
-        auto m2 = create_test_member("bob", dummy_chat_id, std::nullopt, now);
-        auto m3 = create_test_member("charlie", dummy_chat_id, std::nullopt, now - 20s);
+        auto m1 = create_test_member("alice", now - 10s);
+        auto m2 = create_test_member("bob", now);
+        auto m3 = create_test_member("charlie", now - 20s);
 
         run_async(ioc, repo.addMember(ChatMemberDAOConverter::convert(m1)));
         run_async(ioc, repo.addMember(ChatMemberDAOConverter::convert(m2)));
@@ -109,10 +91,9 @@ TEST_CASE("ChatMemberRepository") {
 
         auto result = run_async(ioc, repo.getAllMembers(true));
         REQUIRE(result.size() == 3);
-        // проверяем сортировку: сначала самый свежий (m2), потом m1, потом m3
-        CHECK(result[0].getUserId() == m2.getUserId());
-        CHECK(result[1].getUserId() == m1.getUserId());
-        CHECK(result[2].getUserId() == m3.getUserId());
+        CHECK(result[0].getId() == m2.getId());
+        CHECK(result[1].getId() == m1.getId());
+        CHECK(result[2].getId() == m3.getId());
     }
 
     SUBCASE("getAllMembers returns empty list when no members") {
@@ -120,55 +101,43 @@ TEST_CASE("ChatMemberRepository") {
         CHECK(all.empty());
     }
 
-    SUBCASE("getMembersByUserId returns members with given user_id") {
-        boost::uuids::uuid common_user_id = uuid_gen();
-        // Создаём двух участников с одинаковым user_id в разных чатах
-        ChatMemberModel m1(dummy_chat_id, common_user_id, "user1", std::nullopt);
-        ChatMemberModel m2(dummy_chat_id_2, common_user_id, "user2", std::nullopt);
-        ChatMemberModel m3(dummy_chat_id, uuid_gen(), "user3", std::nullopt); // другой user_id
+    SUBCASE("getMemberById returns member when exists") {
+        auto member = create_test_member();
+        auto dao = ChatMemberDAOConverter::convert(member);
+        run_async(ioc, repo.addMember(dao));
 
-        run_async(ioc, repo.addMember(ChatMemberDAOConverter::convert(m1)));
-        run_async(ioc, repo.addMember(ChatMemberDAOConverter::convert(m2)));
-        run_async(ioc, repo.addMember(ChatMemberDAOConverter::convert(m3)));
-
-        auto result = run_async(ioc, repo.getMembersByUserId(common_user_id));
-        CHECK(result.size() == 2);
-        // порядок не гарантирован, проверим наличие
-        std::vector<boost::uuids::uuid> ids;
-        for (const auto& m : result) ids.push_back(m.getUserId());
-        CHECK(std::find(ids.begin(), ids.end(), m1.getUserId()) != ids.end());
-        CHECK(std::find(ids.begin(), ids.end(), m2.getUserId()) != ids.end());
+        auto retrieved = run_async(ioc, repo.getMemberById(member.getId()));
+        CHECK(retrieved.getId() == member.getId());
+        CHECK(retrieved.getUsername() == member.getUsername());
     }
 
-    SUBCASE("getMembersByUserId returns empty vector when no member found") {
-        auto non_existent = uuid_gen();
-        auto result = run_async(ioc, repo.getMembersByUserId(non_existent));
-        CHECK(result.empty());
+    SUBCASE("getMemberById throws NotFoundError when member does not exist") {
+        auto non_existent_id = uuid_gen();
+        CHECK_THROWS_AS(run_async(ioc, repo.getMemberById(non_existent_id)),
+                        ChatMemberNotFoundError);
     }
 
     SUBCASE("addMember inserts member successfully") {
-        auto member = create_test_member("member", dummy_chat_id);
+        auto member = create_test_member();
         auto dao = ChatMemberDAOConverter::convert(member);
         run_async(ioc, repo.addMember(dao));
 
         auto all = run_async(ioc, repo.getAllMembers());
         CHECK(all.size() == 1);
-        CHECK(all[0].getUserId() == member.getUserId());
-        CHECK(all[0].getChatId() == member.getChatId());
+        CHECK(all[0].getId() == member.getId());
     }
 
-    SUBCASE("addMember throws AlreadyExistsError when member with same (chat_id, user_id) exists") {
-        auto member = create_test_member("member", dummy_chat_id);
+    SUBCASE("addMember throws AlreadyExistsError when member with same id exists") {
+        auto member = create_test_member();
         auto dao = ChatMemberDAOConverter::convert(member);
         run_async(ioc, repo.addMember(dao));
 
-        // Попытка добавить того же пользователя в тот же чат
         CHECK_THROWS_AS(run_async(ioc, repo.addMember(dao)),
                         ChatMemberAlreadyExistsError);
     }
 
     SUBCASE("updateMember modifies existing member") {
-        auto member = create_test_member("original", dummy_chat_id);
+        auto member = create_test_member("original");
         auto dao = ChatMemberDAOConverter::convert(member);
         run_async(ioc, repo.addMember(dao));
 
@@ -176,31 +145,29 @@ TEST_CASE("ChatMemberRepository") {
         auto updated_dao = ChatMemberDAOConverter::convert(member);
         run_async(ioc, repo.updateMember(updated_dao));
 
-        // получаем всех, находим нужного
-        auto all = run_async(ioc, repo.getAllMembers());
-        REQUIRE(all.size() == 1);
-        CHECK(all[0].getUsername() == "updated");
+        auto retrieved = run_async(ioc, repo.getMemberById(member.getId()));
+        CHECK(retrieved.getUsername() == "updated");
     }
 
     SUBCASE("updateMember throws NotFoundError when member does not exist") {
-        auto member = create_test_member("ghost", dummy_chat_id);
+        auto member = create_test_member();
         auto dao = ChatMemberDAOConverter::convert(member);
         CHECK_THROWS_AS(run_async(ioc, repo.updateMember(dao)),
                         ChatMemberNotFoundError);
     }
 
     SUBCASE("removeMember deletes existing member") {
-        auto member = create_test_member("todelete", dummy_chat_id);
+        auto member = create_test_member();
         auto dao = ChatMemberDAOConverter::convert(member);
         run_async(ioc, repo.addMember(dao));
         CHECK(run_async(ioc, repo.getAllMembers()).size() == 1);
 
-        run_async(ioc, repo.removeMember(member.getChatId(), member.getUserId()));
+        run_async(ioc, repo.removeMember(member.getId()));
         CHECK(run_async(ioc, repo.getAllMembers()).empty());
     }
 
     SUBCASE("removeMember does not throw when member does not exist") {
-        auto non_existent_user = uuid_gen();
-        CHECK_NOTHROW(run_async(ioc, repo.removeMember(dummy_chat_id, non_existent_user)));
+        auto non_existent_id = uuid_gen();
+        CHECK_NOTHROW(run_async(ioc, repo.removeMember(non_existent_id)));
     }
 }

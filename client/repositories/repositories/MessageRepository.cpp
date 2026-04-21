@@ -29,7 +29,7 @@ boost::asio::awaitable<MessageModel> MessageRepository::getMessageById(boost::uu
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
     auto blob = UUIDConverter::toBlob(messageId);
     auto results = storage_->get_all<MessageDAO>(
-        sqlite_orm::where(sqlite_orm::is_equal(&MessageDAO::getMessageIdAsBLOB, blob))
+        sqlite_orm::where(sqlite_orm::is_equal(&MessageDAO::getIdAsBLOB, blob))
     );
     if (results.empty()) {
         throw MessageNotFoundError("Message not found");
@@ -39,9 +39,9 @@ boost::asio::awaitable<MessageModel> MessageRepository::getMessageById(boost::uu
 
 boost::asio::awaitable<void> MessageRepository::addMessage(const MessageDAO& message) {
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
-    auto blob = UUIDConverter::toBlob(message.getMessageId());
+    auto blob = UUIDConverter::toBlob(message.getId());
     auto existing = storage_->get_all<MessageDAO>(
-        sqlite_orm::where(sqlite_orm::is_equal(&MessageDAO::getMessageIdAsBLOB, blob))
+        sqlite_orm::where(sqlite_orm::is_equal(&MessageDAO::getIdAsBLOB, blob))
     );
     if (!existing.empty()) {
         throw MessageAlreadyExistsError("Message already exists");
@@ -52,9 +52,9 @@ boost::asio::awaitable<void> MessageRepository::addMessage(const MessageDAO& mes
 
 boost::asio::awaitable<void> MessageRepository::updateMessage(const MessageDAO& message) {
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
-    auto blob = UUIDConverter::toBlob(message.getMessageId());
+    auto blob = UUIDConverter::toBlob(message.getId());
     auto existing = storage_->get_all<MessageDAO>(
-        sqlite_orm::where(sqlite_orm::is_equal(&MessageDAO::getMessageIdAsBLOB, blob))
+        sqlite_orm::where(sqlite_orm::is_equal(&MessageDAO::getIdAsBLOB, blob))
     );
     if (existing.empty()) {
         throw MessageNotFoundError("Message not found");
@@ -67,7 +67,7 @@ boost::asio::awaitable<void> MessageRepository::removeMessage(boost::uuids::uuid
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
     auto blob = UUIDConverter::toBlob(messageId);
     storage_->remove_all<MessageDAO>(
-        sqlite_orm::where(sqlite_orm::is_equal(&MessageDAO::getMessageIdAsBLOB, blob))
+        sqlite_orm::where(sqlite_orm::is_equal(&MessageDAO::getIdAsBLOB, blob))
     );
     co_return;
 }

@@ -12,33 +12,27 @@
 #include "ChatDAOConverter.h"
 #include "UUIDConverter.h"
 
-
 class ChatRepository {
 public:
     using Storage = decltype(DBConfiguration::createStorage(""));
 
     explicit ChatRepository(boost::asio::io_context& ioc, std::shared_ptr<Storage> storage);
 
-    // Возвращает список всех чатов (моделей)
+    // Чаты
     boost::asio::awaitable<std::vector<ChatModel>> getAllChats() const;
-
-    // Возвращает чат по ID, бросает NotFoundError, если не найден
     boost::asio::awaitable<ChatModel> getChatById(boost::uuids::uuid chatId);
-
-    // Вставляет новый чат, бросает AlreadyExistsError, если такой chatId уже есть
     boost::asio::awaitable<void> addChat(const ChatDAO& chat);
-
-    // Обновляет существующий чат, бросает NotFoundError, если не найден
     boost::asio::awaitable<void> updateChat(const ChatDAO& chat);
-
-    // Удаляет чат по ID
     boost::asio::awaitable<void> removeChat(boost::uuids::uuid chatId);
+
+    // Управление участниками чата (прямая работа с таблицей связей)
+    boost::asio::awaitable<void> addMemberToChat(boost::uuids::uuid chatId, boost::uuids::uuid memberId);
+    boost::asio::awaitable<void> removeMemberFromChat(boost::uuids::uuid chatId, boost::uuids::uuid memberId);
+    boost::asio::awaitable<std::vector<ChatModel>> getChatsForMember(boost::uuids::uuid memberId);
 
 private:
     boost::asio::io_context& ioc_;
     std::shared_ptr<Storage> storage_;
 };
-
-
 
 #endif //MORZE_CHATREPOSITORY_H

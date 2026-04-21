@@ -11,7 +11,7 @@
 class MessageDAOConverter {
     public:
     static MessageModel convert(const MessageDAO &dao) {
-        return MessageModel{dao.getMessageId(),
+        return MessageModel{dao.getId(),
             dao.getChatId(),
             dao.getSenderId(),
             dao.getDirection(),

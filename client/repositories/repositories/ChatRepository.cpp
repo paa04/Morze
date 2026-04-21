@@ -27,7 +27,7 @@ boost::asio::awaitable<ChatModel> ChatRepository::getChatById(const boost::uuids
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
     const auto blob = UUIDConverter::toBlob(chatId);
     const auto results = storage_->get_all<ChatDAO>(
-        sqlite_orm::where(sqlite_orm::is_equal(&ChatDAO::getChatIdAsBLOB, blob))
+        sqlite_orm::where(sqlite_orm::is_equal(&ChatDAO::getIdAsBLOB, blob))
     );
     if (results.empty()) {
         throw ChatNotFoundError(std::string_view("Chat with id" +UUIDConverter::toString(chatId)+ "not found"));
@@ -37,9 +37,9 @@ boost::asio::awaitable<ChatModel> ChatRepository::getChatById(const boost::uuids
 
 boost::asio::awaitable<void> ChatRepository::addChat(const ChatDAO &chat) {
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
-    auto blob = UUIDConverter::toBlob(chat.getChatId());
+    auto blob = UUIDConverter::toBlob(chat.getId());
     auto existing = storage_->get_all<ChatDAO>(
-        sqlite_orm::where(sqlite_orm::is_equal(&ChatDAO::getChatIdAsBLOB, blob))
+        sqlite_orm::where(sqlite_orm::is_equal(&ChatDAO::getIdAsBLOB, blob))
     );
     if (!existing.empty()) {
         throw ChatAlreadyExistsError("Chat already exists");
@@ -50,9 +50,9 @@ boost::asio::awaitable<void> ChatRepository::addChat(const ChatDAO &chat) {
 
 boost::asio::awaitable<void> ChatRepository::updateChat(const ChatDAO &chat) {
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
-    auto blob = UUIDConverter::toBlob(chat.getChatId());
+    auto blob = UUIDConverter::toBlob(chat.getId());
     auto existing = storage_->get_all<ChatDAO>(
-        sqlite_orm::where(sqlite_orm::is_equal(&ChatDAO::getChatIdAsBLOB, blob))
+        sqlite_orm::where(sqlite_orm::is_equal(&ChatDAO::getIdAsBLOB, blob))
     );
     if (existing.empty()) {
         throw ChatNotFoundError("Chat not found");
@@ -66,8 +66,45 @@ boost::asio::awaitable<void> ChatRepository::removeChat(boost::uuids::uuid chatI
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
     auto blob = UUIDConverter::toBlob(chatId);
     storage_->remove_all<ChatDAO>(
-        sqlite_orm::where(sqlite_orm::is_equal(&ChatDAO::getChatIdAsBLOB, blob))
+        sqlite_orm::where(sqlite_orm::is_equal(&ChatDAO::getIdAsBLOB, blob))
     );
     co_return;
+}
+
+boost::asio::awaitable<void> ChatRepository::addMemberToChat(boost::uuids::uuid chatId, boost::uuids::uuid memberId) {
+    co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
+    boost::uuids::random_generator gen;
+    ChatMemberRelationDAO rel(gen(), chatId, memberId);
+    storage_->replace(rel);
+    co_return;
+}
+
+boost::asio::awaitable<void> ChatRepository::removeMemberFromChat(boost::uuids::uuid chatId, boost::uuids::uuid memberId) {
+    co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
+    auto chatBlob = UUIDConverter::toBlob(chatId);
+    auto memberBlob = UUIDConverter::toBlob(memberId);
+    storage_->remove_all<ChatMemberRelationDAO>(
+        sqlite_orm::where(sqlite_orm::is_equal(&ChatMemberRelationDAO::getChatIdAsBLOB, chatBlob) and
+                          sqlite_orm::is_equal(&ChatMemberRelationDAO::getMemberIdAsBLOB, memberBlob))
+    );
+    co_return;
+}
+
+boost::asio::awaitable<std::vector<ChatModel>> ChatRepository::getChatsForMember(boost::uuids::uuid memberId) {
+    co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
+    auto blob = UUIDConverter::toBlob(memberId);
+    auto rels = storage_->get_all<ChatMemberRelationDAO>(
+        sqlite_orm::where(sqlite_orm::is_equal(&ChatMemberRelationDAO::getMemberIdAsBLOB, blob))
+    );
+    std::vector<ChatModel> chats;
+    for (const auto& rel : rels) {
+        try {
+            auto chat = co_await getChatById(rel.getChatId());
+            chats.push_back(std::move(chat));
+        } catch (const ChatNotFoundError&) {
+            // чат мог быть удалён, пропускаем
+        }
+    }
+    co_return chats;
 }
 

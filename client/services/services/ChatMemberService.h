@@ -13,10 +13,11 @@ public:
     explicit ChatMemberService(std::shared_ptr<ChatMemberRepository> repo);
 
     boost::asio::awaitable<std::vector<ChatMemberModel>> getAllMembers(bool orderByLastOnlineDesc = true) const;
-    boost::asio::awaitable<std::vector<ChatMemberModel>> getMembersByUserId(boost::uuids::uuid userId) const;
+    boost::asio::awaitable<ChatMemberModel> getMemberById(boost::uuids::uuid memberId) const;
+    boost::asio::awaitable<std::vector<ChatMemberModel>> getMembersByChatId(boost::uuids::uuid chatId) const;
     boost::asio::awaitable<void> addMember(const ChatMemberModel& member) const;
     boost::asio::awaitable<void> updateMember(const ChatMemberModel& member) const;
-    boost::asio::awaitable<void> removeMember(boost::uuids::uuid chatId, boost::uuids::uuid userId) const;
+    boost::asio::awaitable<void> removeMember(boost::uuids::uuid memberId) const;
 
 private:
     std::shared_ptr<ChatMemberRepository> repo_;
