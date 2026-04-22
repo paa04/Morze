@@ -39,4 +39,9 @@
 
 # debug information files
 *.dwo
+
 *.bkp
+.idea
+.vscode
+build
+cmake-build-debug
