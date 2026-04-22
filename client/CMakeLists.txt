@@ -270,6 +270,7 @@ if(BUILD_TESTS)
             controllers/DTO/converters/MessageDTOConverter.h
             controllers/DTO/converters/ConnectionProfileDTOConverter.h
             controllers/DTO/converters/UserDTOConverter.h
+            tests/repository/TestUserRepository.cpp
     )
 
     add_executable(MorzeTests ${TEST_SOURCES})
