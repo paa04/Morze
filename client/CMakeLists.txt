@@ -160,7 +160,15 @@ add_executable(Morze main.cpp
         services/services/SignalingService.cpp
         services/services/SignalingService.h
         services/services/WebRTCService.cpp
-        services/services/WebRTCService.h)
+        services/services/WebRTCService.h
+        controllers/DTO/ChatDto.h
+        controllers/DTO/ChatMemberDTO.h
+        controllers/DTO/ChatMemberDTO.h
+        controllers/DTO/MessageDTO.h
+        controllers/DTO/ConnectionProfileDTO.h
+        controllers/DTO/UserDTO.h
+        controllers/controllers/CommunicationController.cpp
+        controllers/controllers/CommunicationController.h)
 
 target_include_directories(Morze PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
@@ -232,6 +240,14 @@ if(BUILD_TESTS)
             services/services/SignalingService.h
             services/services/WebRTCService.cpp
             services/services/WebRTCService.h
+            controllers/DTO/ChatDto.h
+            controllers/DTO/ChatMemberDTO.h
+            controllers/DTO/ChatMemberDTO.h
+            controllers/DTO/MessageDTO.h
+            controllers/DTO/ConnectionProfileDTO.h
+            controllers/DTO/UserDTO.h
+            controllers/controllers/CommunicationController.cpp
+            controllers/controllers/CommunicationController.h
     )
 
     add_executable(MorzeTests ${TEST_SOURCES})
