@@ -120,13 +120,13 @@ add_executable(Morze main.cpp
         globalConverters/UUIDConverter.h
         config/ConfigManager.cpp
         config/ConfigManager.h
-        repositories/DAO/Converters/ChatDAOConverter.h
+        repositories/DAO/converters/ChatDAOConverter.h
         services/Models/ChatMemberModel.h
         services/Models/MessageModel.h
         services/Models/ConnectionProfileModel.h
-        repositories/DAO/Converters/ChatMemberDAOConverter.h
-        repositories/DAO/Converters/ConnectionProfileDAOConverter.h
-        repositories/DAO/Converters/MessageDAOConverter.h
+        repositories/DAO/converters/ChatMemberDAOConverter.h
+        repositories/DAO/converters/ConnectionProfileDAOConverter.h
+        repositories/DAO/converters/MessageDAOConverter.h
         exceptions/ChatExcpetions.h
         repositories/repositories/ChatRepository.cpp
         repositories/repositories/ChatRepository.h
@@ -144,7 +144,7 @@ add_executable(Morze main.cpp
         repositories/DAO/UserDAO.h
         repositories/DAO/UserDAO.h
         services/Models/UserModel.h
-        repositories/DAO/Converters/UserDAOConverter.h
+        repositories/DAO/converters/UserDAOConverter.h
         exceptions/UserExceptions.h
         repositories/repositories/UserRepository.cpp
         repositories/repositories/UserRepository.h
@@ -168,11 +168,16 @@ add_executable(Morze main.cpp
         controllers/DTO/ConnectionProfileDTO.h
         controllers/DTO/UserDTO.h
         controllers/controllers/CommunicationController.cpp
-        controllers/controllers/CommunicationController.h)
+        controllers/controllers/CommunicationController.h
+        controllers/DTO/converters/ChatDTOConverter.h
+        controllers/DTO/converters/ChatMemberDTOConverter.h
+        controllers/DTO/converters/MessageDTOConverter.h
+        controllers/DTO/converters/ConnectionProfileDTOConverter.h
+        controllers/DTO/converters/UserDTOConverter.h)
 
 target_include_directories(Morze PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
-        ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/Converters
+        ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/converters
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/repositories
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories
         ${CMAKE_CURRENT_SOURCE_DIR}/globalEnums
@@ -248,6 +253,11 @@ if(BUILD_TESTS)
             controllers/DTO/UserDTO.h
             controllers/controllers/CommunicationController.cpp
             controllers/controllers/CommunicationController.h
+            controllers/DTO/converters/ChatDTOConverter.h
+            controllers/DTO/converters/ChatMemberDTOConverter.h
+            controllers/DTO/converters/MessageDTOConverter.h
+            controllers/DTO/converters/ConnectionProfileDTOConverter.h
+            controllers/DTO/converters/UserDTOConverter.h
     )
 
     add_executable(MorzeTests ${TEST_SOURCES})
@@ -256,7 +266,7 @@ if(BUILD_TESTS)
     target_include_directories(MorzeTests PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
-            ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/Converters
+            ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/converters
             ${CMAKE_CURRENT_SOURCE_DIR}/repositories/repositories
             ${CMAKE_CURRENT_SOURCE_DIR}/repositories
             ${CMAKE_CURRENT_SOURCE_DIR}/globalEnums
