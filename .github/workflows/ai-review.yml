@@ -1,0 +1,23 @@
+name: Trigger n8n AI Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  call-n8n:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send PR data to n8n webhook
+        run: |
+          curl -X POST ${{ secrets.N8N_WEBHOOK_URL }} \
+            -H "Content-Type: application/json" \
+            -d '{
+              "action": "${{ github.event.action }}",
+              "repository": {
+                "full_name": "${{ github.repository }}"
+              },
+              "pull_request": {
+                "number": ${{ github.event.pull_request.number }}
+              }
+            }'
