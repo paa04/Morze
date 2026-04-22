@@ -11,7 +11,7 @@ class WebRTCService : public QObject
 {
     Q_OBJECT
 public:
-    explicit WebRTCService(QObject *parent = nullptr);
+    explicit WebRTCService(const std::vector<std::string>& stunServers = {}, QObject *parent = nullptr);
     ~WebRTCService();
 
     // Инициировать P2P-соединение с указанным peerId (создать offer)
@@ -34,6 +34,7 @@ public slots:
     void onOfferReceived(const QString &roomId, const QString &fromPeerId, const QJsonObject &sdp);
     void onAnswerReceived(const QString &roomId, const QString &fromPeerId, const QJsonObject &sdp);
     void onIceCandidateReceived(const QString &roomId, const QString &fromPeerId, const QJsonObject &candidate);
+    void setStunServers(const std::vector<std::string>& servers);
 
 signals:
     // Сигналы для UI
@@ -47,7 +48,7 @@ signals:
     void sendAnswer(const QString &roomId, const QString &peerId, const QJsonObject &sdp);
     void sendIceCandidate(const QString &roomId, const QString &peerId, const QJsonObject &candidate);
 
-private:
+    private:
     struct PeerConnection {
         std::shared_ptr<rtc::PeerConnection> pc;
         std::shared_ptr<rtc::DataChannel> dc;
@@ -56,6 +57,7 @@ private:
         bool makingOffer = false;
     };
 
+    std::vector<std::string> m_stunServers;
     void setupPeerConnection(const QString &roomId, const QString &peerId, bool isInitiator);
     void setupDataChannel(std::shared_ptr<rtc::DataChannel> dc, const QString &peerId);
     void closePeerConnection(const QString &peerId);

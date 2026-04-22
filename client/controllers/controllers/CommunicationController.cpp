@@ -1,8 +1,4 @@
 #include "CommunicationController.h"
-#include "SignalingService.h"
-#include "WebRTCService.h"
-#include <QDebug>
-#include <QJsonDocument>
 
 CommunicationController::CommunicationController(SignalingService *signaling,
                                                  WebRTCService *webRTC,

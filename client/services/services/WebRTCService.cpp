@@ -3,15 +3,23 @@
 #include <QJsonObject>
 #include <QDebug>
 
-WebRTCService::WebRTCService(QObject *parent)
-    : QObject(parent)
+WebRTCService::WebRTCService(const std::vector<std::string>& stunServers, QObject *parent)
+    : QObject(parent), m_stunServers(stunServers)
 {
+    if (m_stunServers.empty()) {
+        // Значение по умолчанию, если ничего не передано
+        m_stunServers = {"stun:stun.l.google.com:19302"};
+    }
 }
 
 WebRTCService::~WebRTCService()
 {
     for (const auto &peerId : m_connections.keys())
         closePeerConnection(peerId);
+}
+
+void WebRTCService::setStunServers(const std::vector<std::string>& servers) {
+    m_stunServers = servers;
 }
 
 void WebRTCService::initiateConnection(const QString &roomId, const QString &peerId)
@@ -85,8 +93,9 @@ void WebRTCService::onIceCandidateReceived(const QString &roomId, const QString 
 void WebRTCService::setupPeerConnection(const QString &roomId, const QString &peerId, bool isInitiator)
 {
     rtc::Configuration config;
-    config.iceServers.emplace_back("stun:stun.l.google.com:19302");
-    // config.iceServers.emplace_back("stun:global.stun.twilio.com:3478"); // резервный
+    for (const auto& url : m_stunServers) {
+        config.iceServers.emplace_back(url);
+    }
 
     auto pc = std::make_shared<rtc::PeerConnection>(config);
     std::shared_ptr<rtc::DataChannel> dc;
@@ -103,7 +112,7 @@ void WebRTCService::setupPeerConnection(const QString &roomId, const QString &pe
     pc->onLocalDescription([this, roomId, peerId](rtc::Description desc) {
         QJsonObject sdp{
             {"type", desc.typeString().c_str()},
-            {"sdp", desc.c_str()}
+            {"sdp", QString::fromStdString(desc)}
         };
         if (desc.type() == rtc::Description::Type::Offer) {
             emit sendOffer(roomId, peerId, sdp);
@@ -121,16 +130,15 @@ void WebRTCService::setupPeerConnection(const QString &roomId, const QString &pe
     });
 
     pc->onStateChange([this, peerId](rtc::PeerConnection::State state) {
-        if (state == rtc::PeerConnection::State::Connected ||
-            state == rtc::PeerConnection::State::Completed) {
-            emit connectionOpened(peerId);
-        } else if (state == rtc::PeerConnection::State::Disconnected ||
-                   state == rtc::PeerConnection::State::Failed ||
-                   state == rtc::PeerConnection::State::Closed) {
-            emit connectionClosed(peerId);
-            closePeerConnection(peerId);
-        }
-    });
+    if (state == rtc::PeerConnection::State::Connected) {
+        emit connectionOpened(peerId);
+    } else if (state == rtc::PeerConnection::State::Disconnected ||
+               state == rtc::PeerConnection::State::Failed ||
+               state == rtc::PeerConnection::State::Closed) {
+        emit connectionClosed(peerId);
+        closePeerConnection(peerId);
+    }
+});
 
     PeerConnection conn{pc, dc, roomId, peerId, isInitiator};
     m_connections[peerId] = conn;

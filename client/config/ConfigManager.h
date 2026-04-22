@@ -21,6 +21,7 @@ public:
 
     struct Signaling {
         std::string server_url = "ws://localhost:9001";
+        std::vector<std::string> stun_urls = {"stun:stun.l.google.com:19302"};
     };
 
     static ConfigManager loadFromFile(const std::string& filepath);

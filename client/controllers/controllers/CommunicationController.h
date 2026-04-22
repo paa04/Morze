@@ -1,18 +1,14 @@
 #ifndef COMMUNICATIONCONTROLLER_H
 #define COMMUNICATIONCONTROLLER_H
 
-#include <QObject>
-#include <QHash>
-#include <QJsonArray>
-#include <QJsonObject>
-#include <memory>
 #include <string>
 
-// DTO
+
 #include "ChatDTO.h"
 #include "MessageDTO.h"
 #include "ChatMemberDTO.h"
-
+#include "SignalingService.h"
+#include "WebRTCService.h"
 class SignalingService;
 class WebRTCService;
 

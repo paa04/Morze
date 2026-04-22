@@ -42,5 +42,10 @@ void ConfigManager::parse(const json& j) {
         auto& sig = j["signaling"];
         if (sig.contains("server_url"))
             signaling_.server_url = sig["server_url"].get<std::string>();
+        if (sig.contains("stun_urls") && sig["stun_urls"].is_array()) {
+            signaling_.stun_urls.clear();
+            for (const auto& url : sig["stun_urls"])
+                signaling_.stun_urls.push_back(url.get<std::string>());
+        }
     }
 }

@@ -99,10 +99,7 @@ target_compile_definitions(Boost_asio INTERFACE BOOST_ASIO_HAS_CO_AWAIT)
 
 
 
-find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets)
-#message(STATUS "Qt version: ${QT_VERSION_MAJOR}")
-#message(STATUS "Qt Core include dirs: ${Qt${QT_VERSION_MAJOR}_INCLUDE_DIRS}")
-#message(STATUS "Qt Core libraries: ${Qt${QT_VERSION_MAJOR}_LIBRARIES}")
+find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets Gui Widgets)
 
 add_executable(Morze main.cpp
         repositories/dbContext/Database.cpp
@@ -161,7 +158,9 @@ add_executable(Morze main.cpp
         services/services/SignalingService.h
         services/services/WebRTCService.cpp
         services/services/WebRTCService.h
-        controllers/DTO/ChatDto.h
+        services/services/ConnectionProfileService.cpp
+        services/services/ConnectionProfileService.h
+        controllers/DTO/ChatDTO.h
         controllers/DTO/ChatMemberDTO.h
         controllers/DTO/ChatMemberDTO.h
         controllers/DTO/MessageDTO.h
@@ -173,20 +172,29 @@ add_executable(Morze main.cpp
         controllers/DTO/converters/ChatMemberDTOConverter.h
         controllers/DTO/converters/MessageDTOConverter.h
         controllers/DTO/converters/ConnectionProfileDTOConverter.h
-        controllers/DTO/converters/UserDTOConverter.h)
+        controllers/DTO/converters/UserDTOConverter.h
+        DI/DependencyContainer.cpp
+        DI/DependencyContainer.h)
 
 target_include_directories(Morze PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/converters
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories/repositories
+        ${CMAKE_CURRENT_SOURCE_DIR}/repositories/dbContext
         ${CMAKE_CURRENT_SOURCE_DIR}/repositories
         ${CMAKE_CURRENT_SOURCE_DIR}/globalEnums
         ${CMAKE_CURRENT_SOURCE_DIR}/globalConverters
         ${CMAKE_CURRENT_SOURCE_DIR}/services/Models
         ${CMAKE_CURRENT_SOURCE_DIR}/services
         ${CMAKE_CURRENT_SOURCE_DIR}/exceptions
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/services
+        ${CMAKE_CURRENT_SOURCE_DIR}/controllers/DTO
+        ${CMAKE_CURRENT_SOURCE_DIR}/controllers/DTO/converters
+        ${CMAKE_CURRENT_SOURCE_DIR}/controllers/controllers
+        ${CMAKE_CURRENT_SOURCE_DIR}/config
+        ${CMAKE_CURRENT_SOURCE_DIR}/DI
         ${Qt6_INCLUDE_DIRS}
-        )
+)
 
 target_link_libraries(Morze PRIVATE
         sqlite_orm::sqlite_orm
@@ -199,6 +207,8 @@ target_link_libraries(Morze PRIVATE
         Qt6::Core
         Qt6::Network
         Qt6::WebSockets
+        Qt6::Gui
+        Qt6::Widgets
 )
 
 if(WIN32)
@@ -245,7 +255,7 @@ if(BUILD_TESTS)
             services/services/SignalingService.h
             services/services/WebRTCService.cpp
             services/services/WebRTCService.h
-            controllers/DTO/ChatDto.h
+            controllers/DTO/ChatDTO.h
             controllers/DTO/ChatMemberDTO.h
             controllers/DTO/ChatMemberDTO.h
             controllers/DTO/MessageDTO.h
@@ -258,6 +268,8 @@ if(BUILD_TESTS)
             controllers/DTO/converters/MessageDTOConverter.h
             controllers/DTO/converters/ConnectionProfileDTOConverter.h
             controllers/DTO/converters/UserDTOConverter.h
+            DI/DependencyContainer.cpp
+            DI/DependencyContainer.h
     )
 
     add_executable(MorzeTests ${TEST_SOURCES})
@@ -290,6 +302,8 @@ if(BUILD_TESTS)
             Qt6::Core
             Qt6::Network
             Qt6::WebSockets
+            Qt6::Gui
+            Qt6::Widgets
     )
 
     # Включаем CTest для интеграции с IDE
