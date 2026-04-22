@@ -229,11 +229,13 @@ if(BUILD_TESTS)
 
     # Исходники тестов
     set(TEST_SOURCES
+            tests/TestMain.cpp
+            repositories/repositories/ChatRepository.cpp
+            repositories/repositories/ChatRepository.h
             tests/repository/TestChatRepository.cpp
             repositories/repositories/ChatRepository.cpp
             repositories/repositories/ChatMemberRepository.cpp
             tests/repository/TestChatMemberRepository.cpp
-            tests/TestMain.cpp
             repositories/repositories/ConnectionProfileRepository.cpp
             repositories/repositories/ConnectionProfileRepository.h
             tests/repository/TestConnectionProfileRepository.cpp
@@ -268,8 +270,6 @@ if(BUILD_TESTS)
             controllers/DTO/converters/MessageDTOConverter.h
             controllers/DTO/converters/ConnectionProfileDTOConverter.h
             controllers/DTO/converters/UserDTOConverter.h
-            DI/DependencyContainer.cpp
-            DI/DependencyContainer.h
     )
 
     add_executable(MorzeTests ${TEST_SOURCES})
@@ -280,12 +280,18 @@ if(BUILD_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO
             ${CMAKE_CURRENT_SOURCE_DIR}/repositories/DAO/converters
             ${CMAKE_CURRENT_SOURCE_DIR}/repositories/repositories
+            ${CMAKE_CURRENT_SOURCE_DIR}/repositories/dbContext
             ${CMAKE_CURRENT_SOURCE_DIR}/repositories
             ${CMAKE_CURRENT_SOURCE_DIR}/globalEnums
             ${CMAKE_CURRENT_SOURCE_DIR}/globalConverters
             ${CMAKE_CURRENT_SOURCE_DIR}/services/Models
             ${CMAKE_CURRENT_SOURCE_DIR}/services
+            ${CMAKE_CURRENT_SOURCE_DIR}/services/services
+            ${CMAKE_CURRENT_SOURCE_DIR}/config
             ${CMAKE_CURRENT_SOURCE_DIR}/exceptions
+            ${CMAKE_CURRENT_SOURCE_DIR}/controllers/controllers
+            ${CMAKE_CURRENT_SOURCE_DIR}/controllers/DTO
+            ${CMAKE_CURRENT_SOURCE_DIR}/controllers/DTO/converters
             ${Qt6_INCLUDE_DIRS}
     )
 

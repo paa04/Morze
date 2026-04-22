@@ -8,10 +8,6 @@
 #include <memory>
 #include <boost/asio/io_context.hpp>
 #include <thread>
-#include <iostream>
-#include <boost/asio/co_spawn.hpp>
-#include <boost/asio/detached.hpp>
-#include <boost/asio/use_awaitable.hpp>
 
 #include "ConfigManager.h"
 #include "Database.h"
