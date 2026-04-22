@@ -274,6 +274,8 @@ if(BUILD_TESTS)
             tests/service/TestChatMemberService.cpp
             tests/service/TestChatService.cpp
             tests/service/TestConfigurationProfile.cpp
+            tests/service/TestMessageService.cpp
+            tests/service/TestUserService.cpp
     )
 
     add_executable(MorzeTests ${TEST_SOURCES})
