@@ -7,6 +7,7 @@
 #include <boost/asio/io_context.hpp>
 
 #include "ChatRepository.h"
+#include "ChatMemberExceptions.h"
 
 ChatRepository::ChatRepository(boost::asio::io_context& ioc, std::shared_ptr<Storage> storage)
     : ioc_(ioc), storage_(std::move(storage))
@@ -73,6 +74,20 @@ boost::asio::awaitable<void> ChatRepository::removeChat(boost::uuids::uuid chatI
 
 boost::asio::awaitable<void> ChatRepository::addMemberToChat(boost::uuids::uuid chatId, boost::uuids::uuid memberId) {
     co_await boost::asio::post(ioc_.get_executor(), boost::asio::use_awaitable);
+
+    auto chatBlob = UUIDConverter::toBlob(chatId);
+    auto memberBlob = UUIDConverter::toBlob(memberId);
+
+    // Проверяем, существует ли уже такая связь
+    auto existing = storage_->get_all<ChatMemberRelationDAO>(
+        sqlite_orm::where(sqlite_orm::is_equal(&ChatMemberRelationDAO::getChatIdAsBLOB, chatBlob) and
+                          sqlite_orm::is_equal(&ChatMemberRelationDAO::getMemberIdAsBLOB, memberBlob))
+    );
+
+    if (!existing.empty()) {
+        throw ChatMemberAlreadyExistsError("Member already in this chat");
+    }
+
     boost::uuids::random_generator gen;
     ChatMemberRelationDAO rel(gen(), chatId, memberId);
     storage_->replace(rel);
