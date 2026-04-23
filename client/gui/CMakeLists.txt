@@ -4,7 +4,7 @@ project(Morze_ui VERSION 0.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick Core)
+find_package(Qt6 REQUIRED COMPONENTS Quick Core Network)
 
 if(TARGET sqlite3)
     set(GUI_SQLITE_TARGET sqlite3)
@@ -89,7 +89,7 @@ set_target_properties(appMorze_ui PROPERTIES
 )
 
 target_link_libraries(appMorze_ui
-    PRIVATE Qt6::Quick Qt6::Core ${GUI_SQLITE_TARGET} sqlite_orm::sqlite_orm Boost::uuid Boost::asio
+    PRIVATE Qt6::Quick Qt6::Core Qt6::Network ${GUI_SQLITE_TARGET} sqlite_orm::sqlite_orm Boost::uuid Boost::asio
 )
 
 target_include_directories(appMorze_ui PRIVATE
