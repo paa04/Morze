@@ -11,6 +11,9 @@ class ChatMemberDTO {
 public:
     ChatMemberDTO() = default;
 
+    ChatMemberDTO(std::string id, std::string username, std::string lastOnlineAt)
+        : id_(std::move(id)), username_(std::move(username)), lastOnlineAt_(std::move(lastOnlineAt)) {}
+
     const std::string& getId() const { return id_; }
     const std::string& getUsername() const { return username_; }
     const std::string& getLastOnlineAt() const { return lastOnlineAt_; }

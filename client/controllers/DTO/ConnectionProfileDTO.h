@@ -10,6 +10,8 @@ class ConnectionProfileDTO {
 public:
     ConnectionProfileDTO() = default;
 
+
+
     const std::string& getId() const { return id_; }
     const std::string& getServerUrl() const { return serverUrl_; }
     const std::string& getStunUrl() const { return stunUrl_; }
