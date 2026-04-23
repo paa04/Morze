@@ -40,8 +40,10 @@
 # debug information files
 *.dwo
 
+*/cmake-buid-debug/
+*/.idea/
 *.bkp
-.idea
+*.db
 .vscode
 build
-cmake-build-debug
+
