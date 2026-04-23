@@ -1,6 +1,8 @@
 #include "DependencyContainer.h"
 
 #include <thread>
+#include <boost/asio/co_spawn.hpp>
+#include <boost/asio/detached.hpp>
 
 DependencyContainer::DependencyContainer(const std::string& configPath)
     : configPath_(configPath)

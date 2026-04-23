@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.1)
+cmake_minimum_required(VERSION 3.16)
 project(Morze)
 include(FetchContent)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -6,28 +6,62 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 #set(CMAKE_AUTOUIC ON)
 set(CMAKE_CXX_STANDARD 23)
+# Shorten FetchContent paths on Windows to avoid MAX_PATH issues in git submodules.
+if(WIN32)
+    set(FETCHCONTENT_BASE_DIR "C:/_morze_fc")
+endif()
 
-set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/qt6" CACHE PATH "Qt6 prefix path")
+# set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/qt6" CACHE PATH "Qt6 prefix path")
 
 FetchContent_Declare(
         sqlite3
         URL https://www.sqlite.org/2026/sqlite-amalgamation-3530000.zip
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(sqlite3)
+set(SQLITE3_C_FILE "${sqlite3_SOURCE_DIR}/sqlite3.c")
+if(NOT EXISTS "${SQLITE3_C_FILE}")
+    file(GLOB SQLITE3_C_CANDIDATES "${sqlite3_SOURCE_DIR}/*/sqlite3.c")
+    list(LENGTH SQLITE3_C_CANDIDATES SQLITE3_C_COUNT)
+    if(SQLITE3_C_COUNT GREATER 0)
+        list(GET SQLITE3_C_CANDIDATES 0 SQLITE3_C_FILE)
+    endif()
+endif()
+if(NOT EXISTS "${SQLITE3_C_FILE}")
+    message(FATAL_ERROR "sqlite3.c not found in fetched sqlite3 sources: ${sqlite3_SOURCE_DIR}")
+endif()
+add_library(sqlite3 STATIC "${SQLITE3_C_FILE}")
+get_filename_component(SQLITE3_INCLUDE_DIR "${SQLITE3_C_FILE}" DIRECTORY)
+target_include_directories(sqlite3 PUBLIC "${SQLITE3_INCLUDE_DIR}")
 
 FetchContent_Declare(
         sqlite_orm
         GIT_REPOSITORY https://github.com/fnc12/sqlite_orm.git
         GIT_TAG        v1.9.1 # Или любой другой тег/коммит, который вы предпочитаете
 )
-FetchContent_MakeAvailable(sqlite_orm)
+FetchContent_GetProperties(sqlite_orm)
+if(NOT sqlite_orm_POPULATED)
+    FetchContent_Populate(sqlite_orm)
+endif()
+add_library(sqlite_orm INTERFACE)
+target_include_directories(sqlite_orm INTERFACE ${sqlite_orm_SOURCE_DIR}/include)
+add_library(sqlite_orm::sqlite_orm ALIAS sqlite_orm)
 
 set(NO_QT ON CACHE BOOL "Disable Qt support in libdatachannel" FORCE)
+set(NO_MEDIA ON CACHE BOOL "Disable media transport in libdatachannel" FORCE)
+if(WIN32 AND NOT DEFINED OPENSSL_ROOT_DIR)
+    # Default location for MinGW OpenSSL from MSYS2
+    set(OPENSSL_ROOT_DIR "C:/msys64/mingw64" CACHE PATH "OpenSSL root directory for libdatachannel")
+endif()
+if(WIN32)
+    set(OPENSSL_USE_STATIC_LIBS FALSE CACHE BOOL "Use dynamic OpenSSL libs" FORCE)
+endif()
 set(CMAKE_AUTOMOC OFF)
 FetchContent_Declare(
         libdatachannel
         GIT_REPOSITORY https://github.com/paullouisageneau/libdatachannel.git
         GIT_TAG v0.24.2
+        GIT_CONFIG core.longpaths=true
 )
 FetchContent_MakeAvailable(libdatachannel)
 set(CMAKE_AUTOMOC ON)
@@ -201,7 +235,7 @@ target_link_libraries(Morze PRIVATE
         sqlite3
         Boost::uuid
         Boost::asio
-        nlohmann_json#::nlohmann_json
+        nlohmann_json::nlohmann_json
         Boost::beast
         datachannel
         Qt6::Core
@@ -213,6 +247,11 @@ target_link_libraries(Morze PRIVATE
 
 if(WIN32)
     target_link_libraries(Morze PRIVATE ws2_32)
+endif()
+
+option(BUILD_GUI_SUBPROJECT "Build Qt Quick GUI subproject" ON)
+if(BUILD_GUI_SUBPROJECT)
+    add_subdirectory(gui)
 endif()
 
 # ------------------- Тесты -------------------

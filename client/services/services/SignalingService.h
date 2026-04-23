@@ -1,11 +1,11 @@
 #ifndef SIGNALINGSERVICE_H
 #define SIGNALINGSERVICE_H
 
-#include <qt6/QtCore/QObject>
-#include <qt6/QtWebSockets/QWebSocket>
-#include <qt6/QtCore/QUrl>
-#include <qt6/QtCore/QJsonObject>
-#include <qt6/QtCore/QJsonArray>
+#include <QObject>
+#include <QWebSocket>
+#include <QUrl>
+#include <QJsonObject>
+#include <QJsonArray>
 
 class SignalingService : public QObject
 {
