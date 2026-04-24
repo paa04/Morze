@@ -17,7 +17,7 @@ WORKDIR /app
 COPY . .
 
 # Собираем сервер в Release-режиме
-RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
 RUN cmake --build build --target signaling_server -j$(nproc)
 
 # Порт по умолчанию (может быть переопределён через переменную PORT)
