@@ -18,7 +18,7 @@ COPY . .
 
 # Собираем сервер в Release-режиме
 RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-RUN cmake --build build -j$(nproc)
+RUN cmake --build build --target signaling_server -j$(nproc)
 
 # Порт по умолчанию (может быть переопределён через переменную PORT)
 EXPOSE 9001
