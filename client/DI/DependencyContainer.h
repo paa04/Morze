@@ -23,6 +23,7 @@
 #include "UserService.h"
 #include "SignalingService.h"
 #include "WebRTCService.h"
+#include "StunProbeService.h"
 #include "CommunicationController.h"
 
 class DependencyContainer {
@@ -43,6 +44,7 @@ public:
     std::shared_ptr<UserService> userService() const { return userService_; }
     std::shared_ptr<SignalingService> signalingService() const { return signaling_; }
     std::shared_ptr<WebRTCService> webRTCService() const { return webRTC_; }
+    std::shared_ptr<StunProbeService> stunProbeService() const { return stunProbe_; }
     std::shared_ptr<CommunicationController> communicationController() const { return commController_; }
 
 private:
@@ -76,6 +78,7 @@ private:
     // Сетевые сервисы
     std::shared_ptr<SignalingService> signaling_;
     std::shared_ptr<WebRTCService> webRTC_;
+    std::shared_ptr<StunProbeService> stunProbe_;
 
     // Контроллеры
     std::shared_ptr<CommunicationController> commController_;

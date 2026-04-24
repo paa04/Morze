@@ -45,6 +45,14 @@ void DependencyContainer::applyStunServersFromProfile()
 
             webRTC_->setStunServers(stunServers);
             std::cout << "STUN servers configured (" << stunServers.size() << ")\n";
+
+            const auto endpoint = stunProbe_->detectPublicEndpoint(stunServers);
+            if (endpoint.has_value()) {
+                std::cout << "Public endpoint detected via STUN: "
+                          << endpoint->ip << ":" << endpoint->port << '\n';
+            } else {
+                std::cout << "Public endpoint was not detected via STUN\n";
+            }
         } catch (const std::exception& e) {
             std::cerr << "Failed to load STUN servers: " << e.what() << '\n';
             webRTC_->setStunServers({"stun:stun.l.google.com:19302"});
@@ -100,6 +108,7 @@ void DependencyContainer::initNetworkServices()
 {
     signaling_ = std::make_shared<SignalingService>();
     webRTC_ = std::make_shared<WebRTCService>();
+    stunProbe_ = std::make_shared<StunProbeService>();
 }
 
 void DependencyContainer::initControllers()

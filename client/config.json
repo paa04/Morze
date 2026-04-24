@@ -7,7 +7,7 @@
     "file": "logs/morze.log"
   },
   "signaling": {
-    "server_url": "ws://localhost:9001",
+    "server_url": "ws://0.0.0.0:9001",
     "stun_url": "stun:stun.l.google.com:19302",
     "stun_urls": [
       "stun:stun.l.google.com:19302",

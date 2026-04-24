@@ -25,6 +25,7 @@
 #include "Database.h"
 #include "MessageService.h"
 #include "MessageRepository.h"
+#include "SignalingService.h"
 
 class ChatListModel final : public QAbstractListModel {
     Q_OBJECT
@@ -173,6 +174,10 @@ public:
     Q_INVOKABLE void selectChatByIndex(int index);
     Q_INVOKABLE void sendMessage(const QString &text);
     Q_INVOKABLE void updateNetworkSettings(const QString &bindAddress, const QString &stunServer, const QString &relayServer);
+    Q_INVOKABLE bool createNewChat(const QString &nickname, const QString &title);
+    Q_INVOKABLE bool joinChatById(const QString &chatOrRoomId, const QString &nickname);
+    /// Удаляет чат с устройства (БД) и снимает выбор.
+    Q_INVOKABLE void removeCurrentChat();
     Q_INVOKABLE void setChatNickname(const QString &chatId, const QString &nickname);
     Q_INVOKABLE QString chatNickname(const QString &chatId) const;
     Q_INVOKABLE void refreshBindAddress();
@@ -199,9 +204,15 @@ private:
     std::string resolveDatabasePath() const;
     QString resolveConfigJsonPath() const;
     void loadStunServersFromConfig();
+    /// IP bind + выбранный до первого refreshProfiles пустой релей: из config.json
+    void loadDefaultNetworkState();
+    QString readSignalingServerUrlFromConfigFile() const;
     void loadChatNicknames();
     void persistChatNicknames() const;
     bool parseEndpoint(const QString &value, QString *host, quint16 *port, QString *error) const;
+    QString resolveSignalingServerUrl() const;
+    bool ensureSignalingConnected();
+    void handleSignalingJoined(const QString &roomId, const QString &roomType);
     QString requestStunMappedAddress(const QString &host, quint16 port, QString *error, qint64 *elapsedMs) const;
     QString extractHostFromStunValue(const QString &value) const;
     QString stripStunPrefix(const QString &value) const;
@@ -222,6 +233,7 @@ private:
     std::shared_ptr<ChatMemberService> memberService_;
     std::shared_ptr<MessageService> messageService_;
     std::shared_ptr<ConnectionProfileService> profileService_;
+    std::shared_ptr<SignalingService> signalingService_;
     ChatListModel chatModel_;
     std::vector<ChatListModel::Item> allChatItems_;
     MessageListModel messageModel_;
@@ -240,5 +252,12 @@ private:
     bool bindCheckOk_ = false;
     bool stunCheckOk_ = false;
     bool relayCheckOk_ = false;
+    QString pendingJoinRoomId_;
+    QString pendingJoinNickname_;
+    QString pendingJoinTitle_;
+    QString pendingJoinMode_;
+    QString pendingJoinRoomType_;
+    /// own peerId from signaling "joined" per roomId (for leave)
+    QHash<QString, QString> myPeerIdByRoom_;
 };
 

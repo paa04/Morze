@@ -2,6 +2,7 @@
 
 #include "domain/models.hpp"
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>

@@ -13,13 +13,13 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMetaObject>
-#include <QNetworkInterface>
 #include <QProcess>
 #include <QRandomGenerator>
 #include <QSettings>
 #include <QTcpSocket>
 #include <QUdpSocket>
 #include <QUrl>
+#include <QUuid>
 
 #include <algorithm>
 #include <chrono>
@@ -30,12 +30,37 @@
 
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/detached.hpp>
+#include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/string_generator.hpp>
 #include <boost/uuid/uuid.hpp>
 
 #include "GlobalEnums.h"
 #include "MessageModel.h"
 #include "UUIDConverter.h"
+
+namespace {
+/** Поле ввода: host:port; подключение WebSocket: ws://… */
+QString normalizeSignalingForConnect(const QString &input) {
+    const QString t = input.trimmed();
+    if (t.isEmpty()) {
+        return {};
+    }
+    if (t.startsWith("wss://", Qt::CaseInsensitive) || t.startsWith("ws://", Qt::CaseInsensitive)) {
+        return t;
+    }
+    return QStringLiteral("ws://%1").arg(t);
+}
+
+QString displaySignalingInSettingsField(const QString &urlOrHostPort) {
+    QString t = urlOrHostPort.trimmed();
+    if (t.startsWith("ws://", Qt::CaseInsensitive)) {
+        t = t.mid(5);
+    } else if (t.startsWith("wss://", Qt::CaseInsensitive)) {
+        t = t.mid(6);
+    }
+    return t;
+}
+} // namespace
 
 ChatListModel::ChatListModel(QObject *parent)
     : QAbstractListModel(parent) {}
@@ -204,9 +229,42 @@ ClientBridge::ClientBridge(QObject *parent)
         memberService_ = std::make_shared<ChatMemberService>(memberRepository_);
         messageService_ = std::make_shared<MessageService>(messageRepository_);
         profileService_ = std::make_shared<ConnectionProfileService>(profileRepository_);
+        signalingService_ = std::make_shared<SignalingService>();
+
+        connect(signalingService_.get(), &SignalingService::joined, this,
+                [this](const QString &roomId, const QString &roomType, const QString &peerId, const QJsonArray &) {
+                    if (!roomId.isEmpty() && !peerId.isEmpty()) {
+                        myPeerIdByRoom_[roomId] = peerId;
+                    }
+                    handleSignalingJoined(roomId, roomType);
+                });
+        connect(signalingService_.get(), &SignalingService::connected, this, [this]() {
+            if (!pendingJoinRoomId_.isEmpty() && !pendingJoinNickname_.isEmpty() && !pendingJoinRoomType_.isEmpty()) {
+                signalingService_->join(pendingJoinRoomId_, pendingJoinNickname_, pendingJoinRoomType_);
+            }
+        });
+        connect(signalingService_.get(), &SignalingService::errorReceived, this,
+                [this](const QString &message) {
+                    pendingJoinRoomId_.clear();
+                    pendingJoinNickname_.clear();
+                    pendingJoinTitle_.clear();
+                    pendingJoinMode_.clear();
+                    pendingJoinRoomType_.clear();
+                    emit errorOccurred(message);
+                });
+        connect(signalingService_.get(), &SignalingService::errorOccurred, this,
+                [this](const QString &message) {
+                    pendingJoinRoomId_.clear();
+                    pendingJoinNickname_.clear();
+                    pendingJoinTitle_.clear();
+                    pendingJoinMode_.clear();
+                    pendingJoinRoomType_.clear();
+                    emit errorOccurred(message);
+                });
 
         loadChatNicknames();
         loadStunServersFromConfig();
+        loadDefaultNetworkState();
         workGuard_.emplace(ioc_.get_executor());
         ioThread_ = std::thread([this]() { ioc_.run(); });
     } catch (const std::exception &e) {
@@ -350,7 +408,7 @@ void ClientBridge::selectChatByIndex(int index) {
 }
 
 void ClientBridge::sendMessage(const QString &text) {
-    if (!messageService_ || selectedChatId_.isEmpty()) {
+    if (!messageService_ || !chatService_ || !memberService_ || selectedChatId_.isEmpty()) {
         return;
     }
 
@@ -361,13 +419,17 @@ void ClientBridge::sendMessage(const QString &text) {
 
     const std::string chatId = selectedChatId_.toStdString();
     const std::string content = trimmed.toStdString();
+    const QString textCopy = trimmed;
 
     boost::asio::co_spawn(
         ioc_,
-        [this, chatId, content]() -> boost::asio::awaitable<void> {
+        [this, chatId, content, textCopy]() -> boost::asio::awaitable<void> {
             try {
                 boost::uuids::string_generator parser;
                 const boost::uuids::uuid chatUuid = parser(chatId);
+                const auto chat = co_await chatService_->getChatById(chatUuid);
+                const QString roomIdForServer = QString::fromStdString(chat.getRoomIdAsString());
+
                 const auto members = co_await memberService_->getMembersByChatId(chatUuid);
                 if (members.empty()) {
                     throw std::runtime_error("В выбранном чате нет участника для sender_id");
@@ -381,11 +443,21 @@ void ClientBridge::sendMessage(const QString &text) {
                     std::chrono::system_clock::now(),
                     DeliveryState::Pending);
                 co_await messageService_->addMessage(message);
-                QMetaObject::invokeMethod(this, [this]() {
-                    refreshMessages();
-                    refreshParticipants();
-                    refreshChats();
-                }, Qt::QueuedConnection);
+                // Signaling: поток asio, QWebSocket — в потоке Qt, после записи в БД шлём на сигнальный сервер
+                QMetaObject::invokeMethod(
+                    this,
+                    [this, roomIdForServer, textCopy]() {
+                        if (signalingService_ && signalingService_->isConnected()) {
+                            QJsonObject payload;
+                            payload["text"] = textCopy;
+                            payload["kind"] = "chat";
+                            signalingService_->groupMessage(roomIdForServer, payload);
+                        }
+                        refreshMessages();
+                        refreshParticipants();
+                        refreshChats();
+                    },
+                    Qt::QueuedConnection);
             } catch (const std::exception &e) {
                 QMetaObject::invokeMethod(this, [this, message = QString::fromUtf8(e.what())]() {
                     emit errorOccurred(message);
@@ -399,27 +471,37 @@ void ClientBridge::updateNetworkSettings(const QString &bindAddress, const QStri
     netBindAddress_ = bindAddress.trimmed();
     netStunServer_ = stripStunPrefix(stunServer);
     netRelayServer_ = relayServer.trimmed();
+    {
+        QSettings s("Morze", "MorzeGUI");
+        s.setValue("ui/netBindAddress", netBindAddress_);
+    }
     emit networkSettingsChanged();
 
     if (!profileService_) {
         return;
     }
 
-    const std::string serverUrl = netBindAddress_.toStdString();
     const std::string stunUrl = ensureStunPrefix(netStunServer_).toStdString();
+    const QString connectWs = normalizeSignalingForConnect(netRelayServer_);
+
     boost::asio::co_spawn(
         ioc_,
-        [this, serverUrl, stunUrl]() -> boost::asio::awaitable<void> {
+        [this, stunUrl, connectWs]() -> boost::asio::awaitable<void> {
             try {
                 auto profiles = co_await profileService_->getAllProfiles(true);
                 if (!profiles.empty()) {
                     auto latest = profiles.front();
-                    latest.setServerUrl(serverUrl);
+                    if (!connectWs.isEmpty()) {
+                        latest.setServerUrl(connectWs.toStdString());
+                    }
                     latest.setStunUrl(stunUrl);
                     latest.setUpdatedAt(std::chrono::system_clock::now());
                     co_await profileService_->updateProfile(latest);
                 } else {
-                    ConnectionProfileModel profile(serverUrl, stunUrl, std::chrono::system_clock::now());
+                    if (connectWs.isEmpty()) {
+                        co_return;
+                    }
+                    ConnectionProfileModel profile(connectWs.toStdString(), stunUrl, std::chrono::system_clock::now());
                     co_await profileService_->addProfile(profile);
                 }
             } catch (const std::exception &e) {
@@ -429,6 +511,138 @@ void ClientBridge::updateNetworkSettings(const QString &bindAddress, const QStri
             }
         },
         boost::asio::detached);
+}
+
+bool ClientBridge::createNewChat(const QString &nickname, const QString &title) {
+    if (!chatService_ || !memberService_ || !signalingService_) {
+        emit errorOccurred("Сервисы чата недоступны");
+        return false;
+    }
+
+    const QString normalizedNick = nickname.trimmed();
+    const QString normalizedTitle = title.trimmed();
+    if (normalizedNick.isEmpty() || normalizedTitle.isEmpty()) {
+        return false;
+    }
+
+    if (!ensureSignalingConnected()) {
+        return false;
+    }
+
+    pendingJoinMode_ = "create";
+    pendingJoinNickname_ = normalizedNick;
+    pendingJoinTitle_ = normalizedTitle;
+    pendingJoinRoomType_ = "group";
+    pendingJoinRoomId_ = QUuid::createUuid().toString(QUuid::WithoutBraces);
+
+    if (signalingService_->isConnected()) {
+        signalingService_->join(pendingJoinRoomId_, pendingJoinNickname_, pendingJoinRoomType_);
+    }
+
+    return true;
+}
+
+void ClientBridge::removeCurrentChat() {
+    if (!chatService_ || selectedChatId_.isEmpty()) {
+        return;
+    }
+    const QString idCopy = selectedChatId_.trimmed();
+    if (idCopy.isEmpty()) {
+        return;
+    }
+    const std::string idStr = idCopy.toStdString();
+    boost::uuids::string_generator gen;
+    boost::uuids::uuid chatId;
+    try {
+        chatId = gen(idStr);
+    } catch (const std::exception &) {
+        emit errorOccurred("Некорректный id чата");
+        return;
+    }
+
+    boost::asio::co_spawn(
+        ioc_,
+        [this, idCopy, chatId]() -> boost::asio::awaitable<void> {
+            try {
+                const auto chat = co_await chatService_->getChatById(chatId);
+                const QString roomIdStr = QString::fromStdString(chat.getRoomIdAsString());
+
+                QMetaObject::invokeMethod(
+                    this,
+                    [this, idCopy, chatId, roomIdStr]() {
+                        if (signalingService_ && signalingService_->isConnected()) {
+                            const QString myPeer = myPeerIdByRoom_.value(roomIdStr);
+                            if (!myPeer.isEmpty()) {
+                                signalingService_->leave(roomIdStr, myPeer);
+                            }
+                        }
+                        myPeerIdByRoom_.remove(roomIdStr);
+
+                        boost::asio::co_spawn(
+                            ioc_,
+                            [this, idCopy, chatId]() -> boost::asio::awaitable<void> {
+                                try {
+                                    co_await chatService_->removeChat(chatId);
+                                    QMetaObject::invokeMethod(
+                                        this,
+                                        [this, idCopy]() {
+                                            const QString t = idCopy.trimmed();
+                                            chatNicknames_.remove(t);
+                                            persistChatNicknames();
+                                            selectChatByIndex(-1);
+                                            refreshChats();
+                                        },
+                                        Qt::QueuedConnection);
+                                } catch (const std::exception &e) {
+                                    QMetaObject::invokeMethod(
+                                        this,
+                                        [this, message = QString::fromUtf8(e.what())]() {
+                                            emit errorOccurred(message);
+                                        },
+                                        Qt::QueuedConnection);
+                                }
+                            },
+                            boost::asio::detached);
+                    },
+                    Qt::QueuedConnection);
+            } catch (const std::exception &e) {
+                QMetaObject::invokeMethod(
+                    this,
+                    [this, message = QString::fromUtf8(e.what())]() {
+                        emit errorOccurred(message);
+                    },
+                    Qt::QueuedConnection);
+            }
+        },
+        boost::asio::detached);
+}
+
+bool ClientBridge::joinChatById(const QString &chatOrRoomId, const QString &nickname) {
+    if (!chatService_ || !memberService_ || !signalingService_) {
+        emit errorOccurred("Сервисы чата недоступны");
+        return false;
+    }
+
+    const QString normalizedId = chatOrRoomId.trimmed();
+    const QString normalizedNick = nickname.trimmed();
+    if (normalizedId.isEmpty() || normalizedNick.isEmpty()) {
+        return false;
+    }
+
+    if (!ensureSignalingConnected()) {
+        return false;
+    }
+
+    pendingJoinMode_ = "join";
+    pendingJoinRoomId_ = normalizedId;
+    pendingJoinNickname_ = normalizedNick;
+    pendingJoinTitle_.clear();
+    pendingJoinRoomType_ = "direct";
+    if (signalingService_->isConnected()) {
+        signalingService_->join(pendingJoinRoomId_, pendingJoinNickname_, pendingJoinRoomType_);
+    }
+
+    return true;
 }
 
 void ClientBridge::setChatNickname(const QString &chatId, const QString &nickname) {
@@ -462,16 +676,30 @@ QString ClientBridge::chatNickname(const QString &chatId) const {
 }
 
 void ClientBridge::refreshBindAddress() {
-    const auto addresses = QNetworkInterface::allAddresses();
-    for (const auto &address : addresses) {
-        if (address.protocol() == QAbstractSocket::IPv4Protocol && !address.isLoopback()) {
-            netBindAddress_ = address.toString();
-            emit networkSettingsChanged();
-            setBindCheckResult(true, QString("IP обновлен: %1").arg(netBindAddress_));
-            return;
-        }
+    QString stunValue = ensureStunPrefix(netStunServer_);
+    if (!stunValue.contains("://") && stunValue.startsWith("stun:", Qt::CaseInsensitive)) {
+        stunValue = "stun://" + stunValue.mid(5);
     }
-    setBindCheckResult(false, "Ошибка: IP не найден");
+
+    const QUrl stunUrl(stunValue);
+    const QString host = stunUrl.host().trimmed();
+    const quint16 port = stunUrl.port(3478) > 0 ? static_cast<quint16>(stunUrl.port(3478)) : static_cast<quint16>(3478);
+    if (host.isEmpty()) {
+        setBindCheckResult(false, "Ошибка: пустой STUN URL");
+        return;
+    }
+
+    QString error;
+    qint64 elapsedMs = 0;
+    const QString mapped = requestStunMappedAddress(host, port, &error, &elapsedMs);
+    if (mapped.isEmpty()) {
+        setBindCheckResult(false, QString("Ошибка STUN: %1").arg(error.isEmpty() ? "нет ответа" : error));
+        return;
+    }
+
+    netBindAddress_ = mapped;
+    emit networkSettingsChanged();
+    setBindCheckResult(true, QString("Public endpoint: %1 · %2 ms").arg(netBindAddress_).arg(elapsedMs));
 }
 
 void ClientBridge::resolvePublicIpViaStun() {
@@ -535,10 +763,12 @@ void ClientBridge::refreshProfiles() {
                 const auto profiles = co_await profileService_->getAllProfiles(true);
                 if (!profiles.empty()) {
                     const auto &profile = profiles.front();
-                    const QString serverUrl = QString::fromStdString(profile.getServerUrl());
+                    const QString signalingFromProfile = QString::fromStdString(profile.getServerUrl());
                     const QString stunUrl = stripStunPrefix(QString::fromStdString(profile.getStunUrl()));
-                    QMetaObject::invokeMethod(this, [this, serverUrl, stunUrl]() {
-                        netBindAddress_ = serverUrl;
+                    QMetaObject::invokeMethod(this, [this, signalingFromProfile, stunUrl]() {
+                        netRelayServer_ = displaySignalingInSettingsField(signalingFromProfile);
+                        QSettings s("Morze", "MorzeGUI");
+                        netBindAddress_ = s.value("ui/netBindAddress", "0.0.0.0").toString();
                         netStunServer_ = stunUrl;
                         if (!netStunServer_.isEmpty() && !stunServerOptions_.contains(netStunServer_)) {
                             stunServerOptions_.prepend(netStunServer_);
@@ -820,6 +1050,126 @@ QString ClientBridge::resolveConfigJsonPath() const {
     return {};
 }
 
+QString ClientBridge::readSignalingServerUrlFromConfigFile() const {
+    const QString configPath = resolveConfigJsonPath();
+    if (configPath.isEmpty()) {
+        return {};
+    }
+
+    QFile file(configPath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    const auto doc = QJsonDocument::fromJson(file.readAll());
+    if (!doc.isObject()) {
+        return {};
+    }
+
+    return doc.object().value("signaling").toObject().value("server_url").toString().trimmed();
+}
+
+void ClientBridge::loadDefaultNetworkState() {
+    {
+        QSettings s("Morze", "MorzeGUI");
+        netBindAddress_ = s.value("ui/netBindAddress", "0.0.0.0").toString();
+    }
+    if (netRelayServer_.trimmed().isEmpty()) {
+        const QString fromFile = readSignalingServerUrlFromConfigFile();
+        if (!fromFile.isEmpty()) {
+            netRelayServer_ = displaySignalingInSettingsField(fromFile);
+            emit networkSettingsChanged();
+        }
+    }
+}
+
+QString ClientBridge::resolveSignalingServerUrl() const {
+    if (!netRelayServer_.trimmed().isEmpty()) {
+        return normalizeSignalingForConnect(netRelayServer_);
+    }
+    return normalizeSignalingForConnect(readSignalingServerUrlFromConfigFile());
+}
+
+bool ClientBridge::ensureSignalingConnected() {
+    if (!signalingService_) {
+        return false;
+    }
+    if (signalingService_->isConnected()) {
+        return true;
+    }
+
+    const QString serverUrl = resolveSignalingServerUrl();
+    if (serverUrl.isEmpty()) {
+        emit errorOccurred("Укажите адрес сигнального сервера (нижняя строка в настройках, «Signaling / TURN») или signaling.server_url в config.json");
+        return false;
+    }
+    signalingService_->connectToServer(QUrl(serverUrl));
+    return true;
+}
+
+void ClientBridge::handleSignalingJoined(const QString &roomId, const QString &roomType) {
+    if (pendingJoinRoomId_.isEmpty() || roomId != pendingJoinRoomId_) {
+        return;
+    }
+
+    const QString nickname = pendingJoinNickname_;
+    QString title = pendingJoinTitle_;
+    const QString mode = pendingJoinMode_;
+
+    pendingJoinRoomId_.clear();
+    pendingJoinNickname_.clear();
+    pendingJoinTitle_.clear();
+    pendingJoinMode_.clear();
+    pendingJoinRoomType_.clear();
+
+    if (title.isEmpty()) {
+        title = mode == "create" ? QString("Новый чат %1").arg(roomId.left(6))
+                                 : QString("Чат %1").arg(roomId.left(6));
+    }
+
+    boost::asio::co_spawn(
+        ioc_,
+        [this, roomId, roomType, nickname, title]() -> boost::asio::awaitable<void> {
+            try {
+                boost::uuids::string_generator parser;
+                const auto roomUuid = parser(roomId.toStdString());
+                const ChatType type = (roomType.compare("group", Qt::CaseInsensitive) == 0)
+                                          ? ChatType::Group
+                                          : ChatType::Direct;
+
+                const auto chats = co_await chatService_->getAllChats();
+                auto chatIt = std::find_if(chats.begin(), chats.end(), [&](const ChatModel &chat) {
+                    return chat.getRoomId() == roomUuid;
+                });
+
+                ChatModel chatModel;
+                if (chatIt == chats.end()) {
+                    chatModel = ChatModel(roomUuid, type, title.toStdString(), std::chrono::system_clock::now(), 0);
+                    co_await chatService_->addChat(chatModel);
+                } else {
+                    chatModel = *chatIt;
+                }
+
+                ChatMemberModel member(nickname.toStdString(), std::chrono::system_clock::now());
+                co_await memberService_->addMember(member);
+                try {
+                    co_await chatService_->addMemberToChat(chatModel.getId(), member.getId());
+                } catch (...) {
+                }
+
+                const QString chatId = QString::fromStdString(chatModel.getIdAsString());
+                QMetaObject::invokeMethod(this, [this, chatId, nickname]() {
+                    setChatNickname(chatId, nickname);
+                    refreshChatData();
+                }, Qt::QueuedConnection);
+            } catch (const std::exception &e) {
+                QMetaObject::invokeMethod(this, [this, message = QString::fromUtf8(e.what())]() {
+                    emit errorOccurred(message);
+                }, Qt::QueuedConnection);
+            }
+        },
+        boost::asio::detached);
+}
+
 void ClientBridge::loadStunServersFromConfig() {
     QStringList loaded;
     const QString configPath = resolveConfigJsonPath();
@@ -1012,11 +1362,10 @@ QString ClientBridge::requestStunMappedAddress(const QString &host, quint16 port
                     mappedPort ^= static_cast<quint16>(cookie >> 16);
                     mappedAddr ^= cookie;
                 }
-                Q_UNUSED(mappedPort);
                 const QString ip = QHostAddress(mappedAddr).toString();
                 if (!ip.isEmpty()) {
                     *elapsedMs = timer.elapsed();
-                    return ip;
+                    return QString("%1:%2").arg(ip).arg(mappedPort);
                 }
             }
         }

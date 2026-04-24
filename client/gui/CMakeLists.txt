@@ -4,7 +4,7 @@ project(Morze_ui VERSION 0.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick Core Network)
+find_package(Qt6 REQUIRED COMPONENTS Quick Core Network QuickControls2 WebSockets)
 
 if(TARGET sqlite3)
     set(GUI_SQLITE_TARGET sqlite3)
@@ -58,6 +58,7 @@ qt_add_executable(appMorze_ui
     ../services/services/ChatMemberService.cpp
     ../services/services/MessageService.cpp
     ../services/services/ConnectionProfileService.cpp
+    ../services/services/SignalingService.cpp
 )
 
 qt_add_qml_module(appMorze_ui
@@ -71,10 +72,10 @@ qt_add_qml_module(appMorze_ui
         img/send.svg
         img/close.svg
         img/logo.svg
+        img/morze.svg
         img/sets.png
         img/refresh.svg
         img/ping.svg
-        img/chat.png
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
@@ -89,7 +90,7 @@ set_target_properties(appMorze_ui PROPERTIES
 )
 
 target_link_libraries(appMorze_ui
-    PRIVATE Qt6::Quick Qt6::Core Qt6::Network ${GUI_SQLITE_TARGET} sqlite_orm::sqlite_orm Boost::uuid Boost::asio
+    PRIVATE Qt6::Quick Qt6::Core Qt6::Network Qt6::QuickControls2 Qt6::WebSockets ${GUI_SQLITE_TARGET} sqlite_orm::sqlite_orm Boost::uuid Boost::asio
 )
 
 target_include_directories(appMorze_ui PRIVATE

@@ -192,6 +192,8 @@ add_executable(Morze main.cpp
         services/services/SignalingService.h
         services/services/WebRTCService.cpp
         services/services/WebRTCService.h
+        services/services/StunProbeService.cpp
+        services/services/StunProbeService.h
         services/services/ConnectionProfileService.cpp
         services/services/ConnectionProfileService.h
         controllers/DTO/ChatDTO.h
@@ -296,6 +298,8 @@ if(BUILD_TESTS)
             services/services/SignalingService.h
             services/services/WebRTCService.cpp
             services/services/WebRTCService.h
+            services/services/StunProbeService.cpp
+            services/services/StunProbeService.h
             controllers/DTO/ChatDTO.h
             controllers/DTO/ChatMemberDTO.h
             controllers/DTO/ChatMemberDTO.h

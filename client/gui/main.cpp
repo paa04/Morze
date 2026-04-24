@@ -3,6 +3,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
+#include <QtQuickControls2/QQuickStyle>
 #include <QTimer>
 
 #include "ClientBridge.h"
@@ -52,8 +53,9 @@ static void morzeApplyWindowsTitleBarColors(QWindow *window)
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
+    QQuickStyle::setStyle(QStringLiteral("Fusion"));
     // Иконка приложения (тот же ресурс, что и в QML-модуле Morze_ui)
-    app.setWindowIcon(QIcon(QStringLiteral(":/qt/qml/Morze_ui/img/chat.png")));
+    app.setWindowIcon(QIcon(QStringLiteral(":/qt/qml/Morze_ui/img/morze.svg")));
 
     QQmlApplicationEngine engine;
     ClientBridge clientBridge;

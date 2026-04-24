@@ -13,7 +13,9 @@ Window {
 
     property int currentTab: 0
     property bool groupInfoOpen: false
+    property bool leaveChatConfirmOpen: false
     property bool addChatPopupOpen: false
+    property string addChatMode: ""
     property string addChatErrorText: ""
 
     Connections {
@@ -233,7 +235,11 @@ Window {
                                 cursorShape: Qt.PointingHandCursor
                                     onClicked: {
                                         addChatPopupOpen = true
+                                        addChatMode = ""
                                         addChatErrorText = ""
+                                        chatIdInput.text = ""
+                                        nicknameInput.text = ""
+                                        chatTitleInput.text = ""
                                     }
                             }
                         }
@@ -652,7 +658,7 @@ Window {
                             Flickable {
                                 id: infoFlick
                                 width: parent.width
-                                height: parent.height - 48
+                                height: parent.height - 48 - 72
                                 contentWidth: width
                                 contentHeight: infoColumn.height
                                 clip: true
@@ -751,6 +757,148 @@ Window {
                                     }
                                 }
                             }
+
+                            // Кнопка «Выйти из чата» + диалог подтверждения
+                            Item {
+                                width: parent.width
+                                height: 72
+                                Rectangle {
+                                    id: leaveChatButton
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.margins: 16
+                                    height: 44
+                                    radius: 10
+                                    color: leaveChatMa.pressed
+                                           ? "#8b1538"
+                                           : (leaveChatMa.containsMouse ? "#9b2344" : "#7a1a35")
+                                    border.width: 1
+                                    border.color: "#a83252"
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "Выйти из чата"
+                                        color: "#ffe8ec"
+                                        font.pixelSize: 14
+                                    }
+                                    MouseArea {
+                                        id: leaveChatMa
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        onClicked: leaveChatConfirmOpen = true
+                                    }
+                                }
+                            }
+                        }
+
+                        // Подтверждение выхода
+                        Rectangle {
+                            visible: leaveChatConfirmOpen
+                            anchors.fill: parent
+                            color: "#b3000000"
+                            z: 20
+                            MouseArea {
+                                anchors.fill: parent
+                                z: 0
+                                onClicked: leaveChatConfirmOpen = false
+                            }
+                            Column {
+                                width: 260
+                                spacing: 14
+                                anchors.centerIn: parent
+                                padding: 18
+                                z: 1
+
+                                Rectangle {
+                                    id: leaveDlgPanel
+                                    width: parent.width
+                                    height: leaveDialogColumn.implicitHeight
+                                    color: "#1a2836"
+                                    radius: 10
+                                    border.width: 1
+                                    border.color: "#2a3a4c"
+                                    clip: true
+
+                                    Column {
+                                        id: leaveDialogColumn
+                                        width: parent.width - 28
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        topPadding: 20
+                                        bottomPadding: 16
+                                        spacing: 12
+
+                                        Text {
+                                            width: parent.width
+                                            text: "Выйти из чата?"
+                                            color: "#e6eef8"
+                                            font.pixelSize: 16
+                                            font.bold: true
+                                            wrapMode: Text.Wrap
+                                        }
+                                        Text {
+                                            width: parent.width
+                                            text: "Чат и связанные сообщения на этом устройстве будут удалены. Продолжить?"
+                                            color: "#7a8fa3"
+                                            font.pixelSize: 12
+                                            wrapMode: Text.Wrap
+                                        }
+                                        Row {
+                                            width: parent.width
+                                            spacing: 10
+                                            topPadding: 6
+
+                                            Rectangle {
+                                                id: leaveCancelRect
+                                                width: (parent.width - 10) / 2
+                                                height: 40
+                                                radius: 8
+                                                color: cancelDlgMa.pressed
+                                                       ? "#1e2d40"
+                                                       : (cancelDlgMa.containsMouse ? "#233348" : "#1a2832")
+                                                border.width: 1
+                                                border.color: "#2e4058"
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: "Отмена"
+                                                    color: "#b8c4d4"
+                                                    font.pixelSize: 14
+                                                }
+                                                MouseArea {
+                                                    id: cancelDlgMa
+                                                    anchors.fill: parent
+                                                    onClicked: leaveChatConfirmOpen = false
+                                                }
+                                            }
+                                            Rectangle {
+                                                id: leaveOkRect
+                                                width: (parent.width - 10) / 2
+                                                height: 40
+                                                radius: 8
+                                                color: leaveOkMa.pressed
+                                                       ? "#7a1a2e"
+                                                       : (leaveOkMa.containsMouse ? "#8f2138" : "#7a1a35")
+                                                border.width: 1
+                                                border.color: "#a83252"
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: "Выйти"
+                                                    color: "#ffe8ec"
+                                                    font.pixelSize: 14
+                                                }
+                                                MouseArea {
+                                                    id: leaveOkMa
+                                                    anchors.fill: parent
+                                                    onClicked: {
+                                                        leaveChatConfirmOpen = false
+                                                        groupInfoOpen = false
+                                                        clientBridge.removeCurrentChat()
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -764,12 +912,19 @@ Window {
 
                 MouseArea {
                     anchors.fill: parent
-                    onClicked: addChatPopupOpen = false
+                    onClicked: {
+                        addChatPopupOpen = false
+                        addChatMode = ""
+                        addChatErrorText = ""
+                        chatIdInput.text = ""
+                        nicknameInput.text = ""
+                        chatTitleInput.text = ""
+                    }
                 }
 
                 Rectangle {
                     width: 380
-                    height: 266
+                    height: contentCol.implicitHeight + 32
                     radius: 14
                     color: "#152232"
                     border.color: "#1c2836"
@@ -780,6 +935,7 @@ Window {
                     }
 
                     Column {
+                        id: contentCol
                         anchors.fill: parent
                         anchors.margins: 16
                         spacing: 12
@@ -791,7 +947,65 @@ Window {
                             font.bold: true
                         }
 
+                        Row {
+                            visible: addChatMode.length === 0
+                            width: parent.width
+                            height: 40
+                            spacing: 10
+
+                            Rectangle {
+                                width: (parent.width - 10) / 2
+                                height: 40
+                                radius: 10
+                                color: modeJoinMa.containsMouse ? "#345a85" : "#2a4a6e"
+                                border.color: "#3d5a80"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Присоединиться"
+                                    color: "#e6eef8"
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                }
+                                MouseArea {
+                                    id: modeJoinMa
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        addChatMode = "join"
+                                        addChatErrorText = ""
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                width: (parent.width - 10) / 2
+                                height: 40
+                                radius: 10
+                                color: modeCreateMa.containsMouse ? "#345a85" : "#2a4a6e"
+                                border.color: "#3d5a80"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Создать новый"
+                                    color: "#e6eef8"
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                }
+                                MouseArea {
+                                    id: modeCreateMa
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        addChatMode = "create"
+                                        addChatErrorText = ""
+                                    }
+                                }
+                            }
+                        }
+
                         Rectangle {
+                            visible: addChatMode === "join"
                             width: parent.width
                             height: 38
                             radius: 10
@@ -823,6 +1037,7 @@ Window {
                         }
 
                         Rectangle {
+                            visible: addChatMode.length > 0
                             width: parent.width
                             height: 38
                             radius: 10
@@ -854,6 +1069,7 @@ Window {
                         }
 
                         Rectangle {
+                            visible: addChatMode === "create"
                             width: parent.width
                             height: 38
                             radius: 10
@@ -885,76 +1101,94 @@ Window {
                         }
 
                         Row {
+                            visible: addChatMode.length > 0
                             width: parent.width
                             height: 36
                             spacing: 8
 
                             Rectangle {
-                                width: 130
+                                width: 92
                                 height: 36
                                 radius: 10
-                                color: createChatMa.containsMouse ? "#345a85" : "#2a4a6e"
+                                color: backModeMa.containsMouse ? "#243447" : "#1a2633"
                                 border.color: "#3d5a80"
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "Создать новый"
-                                    color: "#e6eef8"
+                                    text: "Назад"
+                                    color: "#d7e6ff"
                                     font.pixelSize: 12
-                                    font.bold: true
                                 }
                                 MouseArea {
-                                    id: createChatMa
+                                    id: backModeMa
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        const nick = nicknameInput.text.trim()
-                                        const title = chatTitleInput.text.trim()
-                                        if (nick.length === 0 || title.length === 0) {
-                                            addChatErrorText = "Для создания заполните Никнейм и Название чата"
-                                            return
-                                        }
-                                        const targetId = chatIdInput.text.trim().length > 0
-                                                ? chatIdInput.text.trim()
-                                                : clientBridge.selectedChatId
-                                        clientBridge.setChatNickname(targetId, nick)
+                                        addChatMode = ""
                                         addChatErrorText = ""
                                     }
                                 }
                             }
 
                             Item {
-                                width: parent.width - 130 - 130 - 8 - 10
+                                width: parent.width - 92 - 132 - 8
                                 height: 1
                             }
 
                             Rectangle {
-                                width: 130
+                                width: 132
                                 height: 36
                                 radius: 10
-                                color: joinChatMa.containsMouse ? "#345a85" : "#2a4a6e"
+                                color: addChatActionMa.containsMouse ? "#345a85" : "#2a4a6e"
                                 border.color: "#3d5a80"
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "Присоединиться"
+                                    text: "Добавить"
                                     color: "#e6eef8"
                                     font.pixelSize: 12
                                     font.bold: true
                                 }
                                 MouseArea {
-                                    id: joinChatMa
+                                    id: addChatActionMa
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        const targetId = chatIdInput.text.trim()
                                         const nick = nicknameInput.text.trim()
+                                        if (addChatMode === "create") {
+                                            const title = chatTitleInput.text.trim()
+                                            if (nick.length === 0 || title.length === 0) {
+                                                addChatErrorText = "Для создания заполните Никнейм и Название чата"
+                                                return
+                                            }
+                                            if (!clientBridge.createNewChat(nick, title)) {
+                                                addChatErrorText = "Не удалось создать чат"
+                                                return
+                                            }
+                                            addChatErrorText = ""
+                                            addChatPopupOpen = false
+                                            addChatMode = ""
+                                            chatIdInput.text = ""
+                                            nicknameInput.text = ""
+                                            chatTitleInput.text = ""
+                                            return
+                                        }
+
+                                        const targetId = chatIdInput.text.trim()
                                         if (targetId.length === 0 || nick.length === 0) {
                                             addChatErrorText = "Для входа заполните ID чата и Никнейм"
                                             return
                                         }
-                                        clientBridge.setChatNickname(targetId, nick)
+                                        if (!clientBridge.joinChatById(targetId, nick)) {
+                                            addChatErrorText = "Не удалось присоединиться к чату"
+                                            return
+                                        }
                                         addChatErrorText = ""
+                                        addChatPopupOpen = false
+                                        addChatMode = ""
+                                        chatIdInput.text = ""
+                                        nicknameInput.text = ""
+                                        chatTitleInput.text = ""
                                     }
                                 }
                             }
@@ -1056,7 +1290,7 @@ Window {
                                     selectByMouse: true
                                     clip: true
                                     Component.onCompleted: text = clientBridge.netBindAddress
-                                    onEditingFinished: clientBridge.updateNetworkSettings(text.trim(), stunField.currentText.trim(), relayField.text.trim())
+                                    onEditingFinished: clientBridge.updateNetworkSettings(text.trim(), stunField.editText.trim(), relayField.text.trim())
                                 }
                             }
                             Rectangle {
@@ -1080,16 +1314,16 @@ Window {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        clientBridge.updateNetworkSettings(bindIpField.text.trim(), stunField.currentText.trim(), relayField.text.trim())
+                                        clientBridge.updateNetworkSettings(bindIpField.text.trim(), stunField.editText.trim(), relayField.text.trim())
                                         clientBridge.refreshBindAddress()
                                     }
                                 }
                             }
                         }
                         Text {
-                            visible: clientBridge.bindCheckText.length > 0
-                            text: clientBridge.bindCheckText
-                            color: clientBridge.bindCheckOk ? "#68d391" : "#ff7b7b"
+                            visible: clientBridge && clientBridge.bindCheckText.length > 0
+                            text: clientBridge ? clientBridge.bindCheckText : ""
+                            color: clientBridge && clientBridge.bindCheckOk ? "#68d391" : "#ff7b7b"
                             font.pixelSize: 11
                         }
                     }
@@ -1119,12 +1353,12 @@ Window {
                                     anchors.leftMargin: 12
                                     anchors.rightMargin: 12
                                     editable: true
-                                    model: clientBridge.stunServerOptions
+                                    model: clientBridge ? clientBridge.stunServerOptions : []
                                     currentIndex: -1
                                     Component.onCompleted: editText = clientBridge.netStunServer
-                                    onAccepted: clientBridge.updateNetworkSettings(bindIpField.text.trim(), currentText.trim(), relayField.text.trim())
+                                    onAccepted: clientBridge.updateNetworkSettings(bindIpField.text.trim(), editText.trim(), relayField.text.trim())
                                     onCurrentTextChanged: if (activeFocus)
-                                        clientBridge.updateNetworkSettings(bindIpField.text.trim(), currentText.trim(), relayField.text.trim())
+                                        clientBridge.updateNetworkSettings(bindIpField.text.trim(), editText.trim(), relayField.text.trim())
                                     contentItem: Text {
                                         leftPadding: 0
                                         rightPadding: 0
@@ -1199,16 +1433,16 @@ Window {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        clientBridge.updateNetworkSettings(bindIpField.text.trim(), stunField.currentText.trim(), relayField.text.trim())
+                                        clientBridge.updateNetworkSettings(bindIpField.text.trim(), stunField.editText.trim(), relayField.text.trim())
                                         clientBridge.resolvePublicIpViaStun()
                                     }
                                 }
                             }
                         }
                         Text {
-                            visible: clientBridge.stunCheckText.length > 0
-                            text: clientBridge.stunCheckText
-                            color: clientBridge.stunCheckOk ? "#68d391" : "#ff7b7b"
+                            visible: clientBridge && clientBridge.stunCheckText.length > 0
+                            text: clientBridge ? clientBridge.stunCheckText : ""
+                            color: clientBridge && clientBridge.stunCheckOk ? "#68d391" : "#ff7b7b"
                             font.pixelSize: 11
                         }
                     }
@@ -1217,7 +1451,7 @@ Window {
                         width: parent.width
                         spacing: 6
                         Text {
-                            text: "Relay (TURN)"
+                            text: "Signaling / TURN"
                             color: "#7a8fa3"
                             font.pixelSize: 11
                         }
@@ -1242,7 +1476,7 @@ Window {
                                     selectByMouse: true
                                     clip: true
                                     Component.onCompleted: text = clientBridge.netRelayServer
-                                    onEditingFinished: clientBridge.updateNetworkSettings(bindIpField.text.trim(), stunField.currentText.trim(), text.trim())
+                                    onEditingFinished: clientBridge.updateNetworkSettings(bindIpField.text.trim(), stunField.editText.trim(), text.trim())
                                 }
                             }
                             Rectangle {
@@ -1266,16 +1500,16 @@ Window {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        clientBridge.updateNetworkSettings(bindIpField.text.trim(), stunField.currentText.trim(), relayField.text.trim())
+                                        clientBridge.updateNetworkSettings(bindIpField.text.trim(), stunField.editText.trim(), relayField.text.trim())
                                         clientBridge.checkRelayConnection()
                                     }
                                 }
                             }
                         }
                         Text {
-                            visible: clientBridge.relayCheckText.length > 0
-                            text: clientBridge.relayCheckText
-                            color: clientBridge.relayCheckOk ? "#68d391" : "#ff7b7b"
+                            visible: clientBridge && clientBridge.relayCheckText.length > 0
+                            text: clientBridge ? clientBridge.relayCheckText : ""
+                            color: clientBridge && clientBridge.relayCheckOk ? "#68d391" : "#ff7b7b"
                             font.pixelSize: 11
                         }
                     }
