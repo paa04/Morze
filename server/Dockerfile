@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     libboost-json-dev \
     libsqlite3-dev \
     netcat-openbsd \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
