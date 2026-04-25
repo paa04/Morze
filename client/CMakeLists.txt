@@ -89,13 +89,18 @@ add_boost_library(beast             https://github.com/boostorg/beast           
 
 find_package(nlohmann_json 3.11 QUIET)
 if(NOT nlohmann_json_FOUND)
-    message(STATUS "System nlohmann_json not found, fetching from source...")
-    FetchContent_Declare(
-            json
-            GIT_REPOSITORY https://github.com/nlohmann/json.git
-            GIT_TAG v3.11.3
-    )
-    FetchContent_MakeAvailable(json)
+    # libdatachannel (when fetched) bundles its own nlohmann_json target
+    if(TARGET nlohmann_json)
+        message(STATUS "Using nlohmann_json bundled with libdatachannel")
+    else()
+        message(STATUS "System nlohmann_json not found, fetching from source...")
+        FetchContent_Declare(
+                json
+                GIT_REPOSITORY https://github.com/nlohmann/json.git
+                GIT_TAG v3.11.3
+        )
+        FetchContent_MakeAvailable(json)
+    endif()
 else()
     message(STATUS "Using system nlohmann_json")
 endif()
