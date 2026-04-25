@@ -181,9 +181,9 @@ int main(int argc, char* argv[]) {
         auto commController = container.communicationController();
         auto signaling = container.signalingService();
 
-        std::string serverUrl = "ws://localhost:9001";
+        std::string serverUrl = container.config().signaling().server_url;
         auto profiles = run_and_wait(ioc, container.profileService()->getAllProfiles(true));
-        if (!profiles.empty()) {
+        if (!profiles.empty() && !profiles[0].getServerUrl().empty()) {
             serverUrl = profiles[0].getServerUrl();
         }
         std::cout << "Connecting to signaling server: " << serverUrl << "\n";

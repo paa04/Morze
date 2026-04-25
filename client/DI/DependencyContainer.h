@@ -36,6 +36,7 @@ public:
     void stopIoContext();
 
     // Геттеры для компонентов
+    const ConfigManager& config() const { return *config_; }
     boost::asio::io_context& ioContext() { return ioc_; }
     std::shared_ptr<ChatService> chatService() const { return chatService_; }
     std::shared_ptr<ChatMemberService> memberService() const { return memberService_; }
