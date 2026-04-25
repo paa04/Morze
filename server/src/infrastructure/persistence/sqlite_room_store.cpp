@@ -42,11 +42,17 @@ using Storage = decltype(makeStorage(""));
 
 struct SqliteRoomStore::Impl {
     Storage storage;
+    std::atomic<int64_t> nextSeq{0};
 
     explicit Impl(const std::string& dbPath)
         : storage(makeStorage(dbPath))
     {
         storage.sync_schema();
+        // Initialize counter from max existing seq to guarantee monotonic growth
+        auto maxSeq = storage.max(&domain::GroupMessageRecord::seq);
+        if (maxSeq) {
+            nextSeq.store(*maxSeq);
+        }
     }
 };
 
@@ -104,7 +110,10 @@ void SqliteRoomStore::removeMember(const std::string& memberId) {
 // --- Group Messages ---
 
 int64_t SqliteRoomStore::saveGroupMessage(const domain::GroupMessageRecord& msg) {
-    return impl_->storage.insert(msg);
+    auto record = msg;
+    record.seq = ++impl_->nextSeq;
+    impl_->storage.replace(record);
+    return record.seq;
 }
 
 std::vector<domain::GroupMessageRecord> SqliteRoomStore::getMessagesAfter(
