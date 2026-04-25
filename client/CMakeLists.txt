@@ -336,8 +336,6 @@ if(BUILD_TESTS)
             Qt6::Core
             Qt6::Network
             Qt6::WebSockets
-            Qt6::Gui
-            Qt6::Widgets
     )
 
     # Включаем CTest для интеграции с IDE
