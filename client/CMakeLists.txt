@@ -22,7 +22,25 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(sqlite_orm)
 
-find_package(LibDataChannel REQUIRED)
+find_package(LibDataChannel QUIET)
+if(NOT LibDataChannel_FOUND)
+    message(STATUS "System libdatachannel not found, fetching from source...")
+    set(NO_QT ON CACHE BOOL "Disable Qt support in libdatachannel" FORCE)
+    set(CMAKE_AUTOMOC OFF)
+    FetchContent_Declare(
+            libdatachannel
+            GIT_REPOSITORY https://github.com/paullouisageneau/libdatachannel.git
+            GIT_TAG v0.24.2
+    )
+    FetchContent_MakeAvailable(libdatachannel)
+    set(CMAKE_AUTOMOC ON)
+    # FetchContent target is "datachannel", alias it to match system package
+    if(NOT TARGET LibDataChannel::LibDataChannel)
+        add_library(LibDataChannel::LibDataChannel ALIAS datachannel)
+    endif()
+else()
+    message(STATUS "Using system libdatachannel")
+endif()
 
 FetchContent_Declare(
         cpm
