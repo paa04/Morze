@@ -85,7 +85,7 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy
-        run: railway up --service morze-production
+        run: railway up --service Morze
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_PROJECT_ID: edb0a988-f1f6-4f1d-beb1-5d5c35dedd24
