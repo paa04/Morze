@@ -69,6 +69,7 @@ private:
         std::string roomId;
         std::string roomType;
         std::string myPeerId;
+        std::string username; // saved for reconnect
         std::unordered_map<std::string, ChatMemberDTO> participants; // peerId -> DTO
     };
 

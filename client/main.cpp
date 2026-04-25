@@ -162,12 +162,14 @@ int main(int argc, char* argv[]) {
     QCoreApplication app(argc, argv);
     QNetworkProxy::setApplicationProxy(QNetworkProxy::NoProxy);
 
-    // Parse --db <path> CLI argument
+    // Parse CLI arguments: --db <path> --user <username>
     std::string dbPathOverride;
+    std::string userOverride;
     for (int i = 1; i < argc - 1; ++i) {
         if (std::string(argv[i]) == "--db") {
             dbPathOverride = argv[i + 1];
-            break;
+        } else if (std::string(argv[i]) == "--user") {
+            userOverride = argv[i + 1];
         }
     }
 
@@ -246,6 +248,39 @@ int main(int argc, char* argv[]) {
             std::cerr << "ERROR: Could not connect to signaling server at "
                       << serverUrl << " within 5s.\n"
                       << "Make sure the server is running. Chat/messaging features will not work.\n";
+        }
+
+        // Auto-rejoin saved chats from local DB (API.md: "Чек-лист для запуска клиента")
+        if (wsConnected && !userOverride.empty()) {
+            auto savedChats = run_and_wait(ioc, chatService->getAllChats());
+            if (!savedChats.empty()) {
+                std::cout << "Rejoining " << savedChats.size() << " saved chat(s) as " << userOverride << "...\n";
+                currentUsername = userOverride;
+                for (const auto& c : savedChats) {
+                    auto dto = ChatDTOConverter::toDto(c);
+                    commController->joinChat(dto, userOverride);
+                    joinedRooms.insert(dto.getRoomId());
+
+                    // Ensure selfMemberIds is populated for persistence
+                    if (selfMemberIds.find(dto.getRoomId()) == selfMemberIds.end()) {
+                        std::string mid = boost::uuids::to_string(boost::uuids::random_generator()());
+                        try {
+                            ChatMemberDTO selfMember;
+                            selfMember.setId(mid);
+                            selfMember.setUsername(userOverride);
+                            selfMember.setLastOnlineAt(TimePointConverter::toIsoString(std::chrono::system_clock::now()));
+                            run_and_wait(ioc, memberService->addMember(ChatMemberDTOConverter::fromDto(selfMember)));
+                            selfMemberIds[dto.getRoomId()] = mid;
+                        } catch (const std::exception& e) {
+                            // Member may already exist from previous session
+                        }
+                    }
+                }
+                // Wait for server responses
+                for (int i = 0; i < 30; ++i)
+                    QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+                std::cout << "Rejoin complete.\n";
+            }
         }
 
         // Helper: persist queued incoming messages (called from main loop only)

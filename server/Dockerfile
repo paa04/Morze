@@ -13,12 +13,13 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Копируем исходный код сервера
+# Копируем исходный код сервера (no-cache: forces rebuild)
 COPY . .
 
-# Собираем сервер в Release-режиме
-RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
-RUN cmake --build build --target signaling_server -j$(nproc)
+# Собираем сервер в Release-режиме (single RUN to avoid stale cmake cache)
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+    && cmake --build build --target signaling_server -j$(nproc)
 
 # Порт по умолчанию (может быть переопределён через переменную PORT)
 EXPOSE 9001
