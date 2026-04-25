@@ -1,6 +1,7 @@
 #include "SignalingService.h"
 #include <QTimer>
 #include <QJsonDocument>
+#include <iostream>
 
 SignalingService::SignalingService(QObject *parent)
     : QObject(parent)
@@ -141,6 +142,10 @@ void SignalingService::onTextMessageReceived(const QString &message)
 void SignalingService::handleMessage(const QJsonObject &msg)
 {
     QString type = msg["type"].toString();
+    if (type == "buffered-messages" || type == "error") {
+        std::cout << "[WS-IN] " << QJsonDocument(msg).toJson(QJsonDocument::Compact).toStdString() << "\n";
+        std::cout.flush();
+    }
     if (type == "joined") {
         emit joined(msg["roomId"].toString(),
                     msg["roomType"].toString(),

@@ -41,6 +41,7 @@ void CommunicationController::joinChat(const ChatDTO& chat, const std::string& u
     RoomState state;
     state.roomId = chat.getRoomId();
     state.roomType = chat.getType();
+    state.username = username;
     m_rooms[chat.getRoomId()] = state;
 }
 
@@ -95,8 +96,30 @@ std::vector<ChatMemberDTO> CommunicationController::getParticipants(const std::s
 }
 
 // --- Входящие от SignalingService ---
-void CommunicationController::onSignalingConnected() {}
-void CommunicationController::onSignalingDisconnected() {}
+void CommunicationController::onSignalingConnected()
+{
+    // Re-join all rooms we were in before disconnect (API.md: "Чек-лист для запуска клиента")
+    for (auto& [roomId, state] : m_rooms) {
+        if (state.username.empty()) continue;
+        m_signaling->join(QString::fromStdString(roomId),
+                          QString::fromStdString(state.username),
+                          QString::fromStdString(state.roomType));
+    }
+}
+
+void CommunicationController::onSignalingDisconnected()
+{
+    // Close all WebRTC connections — they're dead without signaling
+    for (auto& [roomId, state] : m_rooms) {
+        for (const auto& [peerId, _] : state.participants) {
+            m_webRTC->closeConnection(QString::fromStdString(peerId));
+        }
+        state.participants.clear();
+        state.myPeerId.clear();
+    }
+    m_peerToRoom.clear();
+    m_pendingMessages.clear();
+}
 
 void CommunicationController::onSignalingJoined(const QString& roomId, const QString& roomType,
                                                 const QString& peerId, const QJsonArray& participants)
@@ -191,6 +214,8 @@ void CommunicationController::onSignalingGroupMessageReceived(const QString& roo
 
 void CommunicationController::onSignalingBufferedMessagesReceived(const QString& roomId, const QJsonArray& messages)
 {
+    std::cout << "[BUFFERED] Received " << messages.size() << " buffered message(s) for room " << roomId.toStdString() << "\n";
+    std::cout.flush();
     for (const QJsonValue& v : messages) {
         QJsonObject obj = v.toObject();
         onSignalingGroupMessageReceived(roomId,
