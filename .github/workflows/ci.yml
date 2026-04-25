@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -71,3 +71,21 @@ jobs:
         run: |
           cd build
           ./MorzeTests
+
+  deploy:
+    name: Deploy to Railway
+    needs: [server, client]
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'workflow_dispatch'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy
+        run: railway up --service morze-production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: edb0a988-f1f6-4f1d-beb1-5d5c35dedd24
