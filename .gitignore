@@ -45,5 +45,7 @@
 *.bkp
 *.db
 .vscode
-build
+build/
+server/build/
+server/cmake-build-debug/
 

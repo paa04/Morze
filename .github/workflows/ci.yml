@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -10,26 +10,82 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  server:
+    name: Server (build + test)
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install system dependencies
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libboost-system-dev libboost-json-dev libsqlite3-dev libgtest-dev
+
+      - uses: lukka/get-cmake@latest
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -S server
+
+      - name: Build server
+        run: cmake --build build --target signaling_server -j$(nproc)
+
+      - name: Build tests
+        run: cmake --build build --target signaling_server_tests room_registry_tests sqlite_room_store_tests signaling_e2e_tests persistence_e2e_tests -j$(nproc)
+
+      - name: Run unit tests
+        run: |
+          cd build
+          ./signaling_server_tests
+          ./room_registry_tests
+          ./sqlite_room_store_tests
+
+      - name: Run e2e tests
+        run: |
+          cd build
+          ./signaling_e2e_tests
+          ./persistence_e2e_tests
+
+  client:
+    name: Client (build + test)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libsqlite3-dev qt6-base-dev qt6-websockets-dev libgl1-mesa-dev
-      - name: Setup CMake
-        uses: lukka/get-cmake@latest
 
-      - name: Configure CMake
-        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -S ${{github.workspace}}/client
+      - uses: lukka/get-cmake@latest
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -S client
+
+      - name: Build client
+        run: cmake --build build --target Morze -j$(nproc)
 
       - name: Build tests
-        run: cmake --build ${{github.workspace}}/build --target MorzeTests -j$(nproc)
+        run: cmake --build build --target MorzeTests -j$(nproc)
 
       - name: Run tests
         run: |
-          cd ${{github.workspace}}/build
+          cd build
           ./MorzeTests
+
+  deploy:
+    name: Deploy to Railway
+    needs: [server, client]
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'workflow_dispatch'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy
+        run: railway up --service morze-production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: edb0a988-f1f6-4f1d-beb1-5d5c35dedd24

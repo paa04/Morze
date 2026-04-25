@@ -15,8 +15,10 @@ namespace signaling::domain
     {
         auto now = std::chrono::system_clock::now();
         auto time = std::chrono::system_clock::to_time_t(now);
+        std::tm buf{};
+        gmtime_r(&time, &buf);
         std::ostringstream oss;
-        oss << std::put_time(std::gmtime(&time), "%Y-%m-%dT%H:%M:%SZ");
+        oss << std::put_time(&buf, "%Y-%m-%dT%H:%M:%SZ");
         return oss.str();
     }
 
@@ -33,6 +35,19 @@ namespace signaling::domain
     std::string RoomRegistry::generatePeerId()
     {
         return "peer" + std::to_string(nextPeerSeq_++);
+    }
+
+    RoomRegistry::ClientInfo* RoomRegistry::findClient(IConnection* session, const std::string& roomId)
+    {
+        auto range = clients_.equal_range(session);
+        for (auto it = range.first; it != range.second; ++it)
+        {
+            if (it->second.roomId == roomId)
+            {
+                return &it->second;
+            }
+        }
+        return nullptr;
     }
 
     std::vector<std::shared_ptr<IConnection>> RoomRegistry::collectOnlinePeers(
@@ -75,9 +90,10 @@ namespace signaling::domain
             return out;
         }
 
-        if (clients_.find(session.get()) != clients_.end())
+        // Check if this session is already in THIS room
+        if (findClient(session.get(), roomId) != nullptr)
         {
-            out.error = "session already joined";
+            out.error = "session already joined this room";
             return out;
         }
 
@@ -114,6 +130,7 @@ namespace signaling::domain
         // Check for reconnection: existing member with same username
         auto members = store_->findMembersByRoom(roomId);
         std::string existingPeerId;
+        int64_t existingAckedSeq{0};
 
         for (const auto &m : members)
         {
@@ -127,6 +144,7 @@ namespace signaling::domain
                     return out;
                 }
                 existingPeerId = m.member_id;
+                existingAckedSeq = m.last_acked_msg_seq;
                 break;
             }
         }
@@ -164,9 +182,9 @@ namespace signaling::domain
         if (isReconnect)
         {
             out.peerId = existingPeerId;
-            // Update last_online_at
+            // Update last_online_at, preserve ack cursor
             store_->saveMember(RoomMemberRecord{
-                existingPeerId, username, now, roomId
+                existingPeerId, username, now, roomId, existingAckedSeq
             });
         } else
         {
@@ -192,20 +210,14 @@ namespace signaling::domain
     {
         std::lock_guard<std::mutex> lock(mu_);
 
-        auto senderIt = clients_.find(sender.get());
-        if (senderIt == clients_.end())
+        auto *info = findClient(sender.get(), roomId);
+        if (!info)
         {
             error = "join room before signaling";
             return std::nullopt;
         }
 
-        if (senderIt->second.roomId != roomId)
-        {
-            error = "roomId does not match active session room";
-            return std::nullopt;
-        }
-
-        if (senderIt->second.roomType != RoomType::Direct)
+        if (info->roomType != RoomType::Direct)
         {
             error = "offer/answer/ice-candidate are allowed only in direct rooms";
             return std::nullopt;
@@ -226,7 +238,15 @@ namespace signaling::domain
             return std::nullopt;
         }
 
-        return SignalRoute{std::move(target), senderIt->second.peerId, roomId};
+        // Verify target peer is in the same room
+        auto *targetInfo = findClient(target.get(), roomId);
+        if (!targetInfo)
+        {
+            error = "target peer is not in this room";
+            return std::nullopt;
+        }
+
+        return SignalRoute{std::move(target), info->peerId, roomId};
     }
 
     std::optional<BroadcastResult>
@@ -235,21 +255,14 @@ namespace signaling::domain
     {
         std::lock_guard<std::mutex> lock(mu_);
 
-        auto senderIt = clients_.find(sender.get());
-
-        if (senderIt == clients_.end())
+        auto *info = findClient(sender.get(), roomId);
+        if (!info)
         {
             error = "join room before signaling";
             return std::nullopt;
         }
 
-        if (senderIt->second.roomId != roomId)
-        {
-            error = "roomId does not match active session room";
-            return std::nullopt;
-        }
-
-        if (senderIt->second.roomType != RoomType::Group)
+        if (info->roomType != RoomType::Group)
         {
             error = "group message allowed only in group chats";
             return std::nullopt;
@@ -257,11 +270,11 @@ namespace signaling::domain
 
         // Save message to DB
         auto seq = store_->saveGroupMessage(GroupMessageRecord{
-            0, roomId, senderIt->second.peerId, payload, currentTimestamp()
+            0, roomId, info->peerId, payload, currentTimestamp()
         });
 
-        auto recipients = collectOnlinePeers(roomId, senderIt->second.peerId);
-        return BroadcastResult{std::move(recipients), senderIt->second.peerId, roomId, seq};
+        auto recipients = collectOnlinePeers(roomId, info->peerId);
+        return BroadcastResult{std::move(recipients), info->peerId, roomId, seq};
     }
 
     std::vector<BufferedMessage> RoomRegistry::getPendingMessages(const std::string &memberId)
@@ -294,48 +307,38 @@ namespace signaling::domain
     {
         std::lock_guard<std::mutex> lock(mu_);
 
-        auto clientIt = clients_.find(session.get());
-        if (clientIt == clients_.end())
+        auto *info = findClient(session.get(), roomId);
+        if (!info)
         {
-            error = "session is not in any room";
+            error = "session is not in this room";
             return false;
         }
 
-        if (clientIt->second.roomId != roomId)
-        {
-            error = "roomId does not match active session room";
-            return false;
-        }
-
-        store_->updateLastAckedSeq(clientIt->second.peerId, upToSeq);
+        store_->updateLastAckedSeq(info->peerId, upToSeq);
         store_->cleanupMessages(roomId);
         return true;
     }
 
-    DisconnectResult RoomRegistry::disconnect(const std::shared_ptr<IConnection> &session)
+    std::vector<DisconnectResult> RoomRegistry::disconnect(const std::shared_ptr<IConnection> &session)
     {
         std::lock_guard<std::mutex> lock(mu_);
 
-        DisconnectResult out;
+        std::vector<DisconnectResult> results;
 
-        auto clientIt = clients_.find(session.get());
-        if (clientIt == clients_.end())
+        auto range = clients_.equal_range(session.get());
+        for (auto it = range.first; it != range.second; ++it)
         {
-            return out;
+            DisconnectResult out;
+            out.hadMembership = true;
+            out.roomId = it->second.roomId;
+            out.peerId = it->second.peerId;
+            out.peersToNotify = collectOnlinePeers(out.roomId, out.peerId);
+            connections_.erase(out.peerId);
+            results.push_back(std::move(out));
         }
 
-        out.hadMembership = true;
-        out.roomId = clientIt->second.roomId;
-        out.peerId = clientIt->second.peerId;
-
-        // Collect online peers to notify before removing connection
-        out.peersToNotify = collectOnlinePeers(out.roomId, out.peerId);
-
-        // Remove peer session from DB for group rooms
-        // Remove from RAM only — member stays in DB
-        connections_.erase(out.peerId);
-        clients_.erase(clientIt);
-        return out;
+        clients_.erase(session.get());
+        return results;
     }
 
     LeaveResult RoomRegistry::leave(const std::shared_ptr<IConnection> &session,
@@ -347,24 +350,29 @@ namespace signaling::domain
 
         LeaveResult out;
 
-        auto clientIt = clients_.find(session.get());
-        if (clientIt == clients_.end())
+        // Find the specific entry for this room
+        auto range = clients_.equal_range(session.get());
+        auto clientIt = range.second; // will point to end of range if not found
+        for (auto it = range.first; it != range.second; ++it)
         {
-            if (roomIdCheck.has_value() || peerIdCheck.has_value())
+            bool roomMatch = !roomIdCheck.has_value() || *roomIdCheck == it->second.roomId;
+            bool peerMatch = !peerIdCheck.has_value() || *peerIdCheck == it->second.peerId;
+            if (roomMatch && peerMatch)
             {
-                error = "session is not in any room";
+                clientIt = it;
+                break;
             }
-            return out;
         }
 
-        if (roomIdCheck.has_value() && *roomIdCheck != clientIt->second.roomId)
+        if (clientIt == range.second)
         {
-            error = "roomId does not match active session room";
-            return out;
-        }
-        if (peerIdCheck.has_value() && *peerIdCheck != clientIt->second.peerId)
-        {
-            error = "peerId does not match active session peerId";
+            if (range.first == range.second)
+            {
+                error = "session is not in any room";
+            } else
+            {
+                error = "roomId/peerId does not match any active session room";
+            }
             return out;
         }
 
