@@ -3,6 +3,7 @@
 #include "application/protocol.hpp"
 
 #include <boost/json.hpp>
+#include <iostream>
 
 namespace signaling::application
 {
@@ -43,6 +44,22 @@ namespace signaling::application
 
     void MessageHandler::handleMessage(const std::shared_ptr<domain::IConnection> &session,
                                        const std::string &raw)
+    {
+        try {
+            handleMessageImpl(session, raw);
+        } catch (const std::exception &ex) {
+            try {
+                session->sendText(toText(protocol::makeError(
+                    std::string("internal error: ") + ex.what())));
+            } catch (...) {}
+            std::cerr << "[ERROR] handleMessage exception: " << ex.what() << "\n";
+        } catch (...) {
+            std::cerr << "[ERROR] handleMessage unknown exception\n";
+        }
+    }
+
+    void MessageHandler::handleMessageImpl(const std::shared_ptr<domain::IConnection> &session,
+                                           const std::string &raw)
     {
         std::string parseError;
         auto parsed = protocol::parseObject(raw, parseError);
@@ -252,17 +269,23 @@ namespace signaling::application
 
     void MessageHandler::handleDisconnect(const std::shared_ptr<domain::IConnection> &session)
     {
-        auto result = registry_->disconnect(session);
-        if (!result.hadMembership)
-        {
-            return;
-        }
+        try {
+            auto result = registry_->disconnect(session);
+            if (!result.hadMembership)
+            {
+                return;
+            }
 
-        // Notify peers that this member went offline (not "left" — they're still a member)
-        const auto leftMsg = toText(protocol::makePeerLeft(result.roomId, result.peerId));
-        for (const auto &peer: result.peersToNotify)
-        {
-            peer->sendText(leftMsg);
+            // Notify peers that this member went offline (not "left" — they're still a member)
+            const auto leftMsg = toText(protocol::makePeerLeft(result.roomId, result.peerId));
+            for (const auto &peer: result.peersToNotify)
+            {
+                peer->sendText(leftMsg);
+            }
+        } catch (const std::exception &ex) {
+            std::cerr << "[ERROR] handleDisconnect exception: " << ex.what() << "\n";
+        } catch (...) {
+            std::cerr << "[ERROR] handleDisconnect unknown exception\n";
         }
     }
 

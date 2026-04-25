@@ -22,15 +22,8 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(sqlite_orm)
 
-set(NO_QT ON CACHE BOOL "Disable Qt support in libdatachannel" FORCE)
-set(CMAKE_AUTOMOC OFF)
-FetchContent_Declare(
-        libdatachannel
-        GIT_REPOSITORY https://github.com/paullouisageneau/libdatachannel.git
-        GIT_TAG v0.24.2
-)
-FetchContent_MakeAvailable(libdatachannel)
-set(CMAKE_AUTOMOC ON)
+find_package(LibDataChannel REQUIRED)
+
 FetchContent_Declare(
         cpm
         GIT_REPOSITORY https://github.com/cpm-cmake/CPM.cmake
@@ -76,12 +69,7 @@ add_boost_library(uuid              https://github.com/boostorg/uuid            
 add_boost_library(asio              https://github.com/boostorg/asio            boost-1.90.0)
 add_boost_library(beast             https://github.com/boostorg/beast           boost-1.90.0)
 
-#FetchContent_Declare(
-#        json
-#        GIT_REPOSITORY https://github.com/nlohmann/json.git
-#        GIT_TAG v3.11.3
-#)
-#FetchContent_MakeAvailable(json)
+find_package(nlohmann_json 3.11 REQUIRED)
 
 target_link_libraries(Boost_uuid INTERFACE
         Boost_config Boost_core Boost_assert Boost_throw_exception
@@ -203,9 +191,9 @@ target_link_libraries(Morze PRIVATE
         sqlite3
         Boost::uuid
         Boost::asio
-        nlohmann_json#::nlohmann_json
+        nlohmann_json::nlohmann_json
         Boost::beast
-        datachannel
+        LibDataChannel::LibDataChannel
         Qt6::Core
         Qt6::Network
         Qt6::WebSockets
@@ -312,7 +300,7 @@ if(BUILD_TESTS)
             Boost::beast
             nlohmann_json::nlohmann_json
             doctest::doctest
-            datachannel
+            LibDataChannel::LibDataChannel
             Qt6::Core
             Qt6::Network
             Qt6::WebSockets

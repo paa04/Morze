@@ -96,6 +96,7 @@ auto run_and_wait(boost::asio::io_context& ioc, Awaitable&& awaitable) {
         }
     }, boost::asio::detached);
 
+    ioc.restart();
     ioc.run_one();
     while (!result && !exception) {
         QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
@@ -192,6 +193,8 @@ int main(int argc, char* argv[]) {
         std::string currentUsername;
         // roomId → self member UUID (for FK-safe message persistence)
         std::map<std::string, std::string> selfMemberIds;
+        // "roomId:peerId" → local member UUID (for remote senders)
+        std::map<std::string, std::string> peerMemberIds;
 
         // Wire up feedback signals BEFORE connecting
         bool wsConnected = false;
@@ -210,44 +213,23 @@ int main(int argc, char* argv[]) {
         QObject::connect(commController.get(), &CommunicationController::errorOccurred,
             [](const std::string& err) { std::cerr << "\n[!] Error: " << err << "\n"; });
 
-        // Real-time incoming messages + persistence
+        // Queue incoming messages — persist in main loop, NOT in signal handler
+        // (run_and_wait inside signal causes reentrant processEvents → deadlock)
+        std::vector<MessageDTO> incomingQueue;
         QObject::connect(commController.get(), &CommunicationController::messageReceived,
             [&](const MessageDTO& msg) {
                 std::cout << "\n>>> [" << msg.getSenderId() << "]: "
                           << msg.getContent() << "\n";
-                // Persist: map roomId → local chatId, use selfMemberId for sender FK
-                try {
-                    std::string localChatId = findLocalChatId(ioc, chatService, msg.getChatId());
-                    if (localChatId.empty()) throw std::runtime_error("chat not in local DB");
-
-                    // Find or create a member ID for the sender
-                    std::string senderMemberId;
-                    auto it = selfMemberIds.find(msg.getChatId());
-                    if (it != selfMemberIds.end()) {
-                        senderMemberId = it->second;
-                    } else {
-                        throw std::runtime_error("no member record for this room");
-                    }
-
-                    MessageDTO saveable;
-                    saveable.setId(boost::uuids::to_string(boost::uuids::random_generator()()));
-                    saveable.setChatId(localChatId);
-                    saveable.setSenderId(senderMemberId);
-                    saveable.setContent(msg.getContent());
-                    saveable.setDirection("incoming");
-                    saveable.setDeliveryState("delivered");
-                    saveable.setCreatedAt(msg.getCreatedAt().empty()
-                        ? TimePointConverter::toIsoString(std::chrono::system_clock::now())
-                        : msg.getCreatedAt());
-                    auto model = MessageDTOConverter::fromDto(saveable);
-                    run_and_wait(ioc, messageService->addMessage(model));
-                } catch (const std::exception& e) {
-                    std::cerr << "[warn] Could not save incoming message: " << e.what() << "\n";
-                }
+                incomingQueue.push_back(msg);
             });
+        // peerUsernames: remember username for lazy DB creation later
+        std::map<std::string, std::string> peerUsernames; // "roomId:peerId" → username
         QObject::connect(commController.get(), &CommunicationController::participantJoined,
-            [](const std::string& roomId, const ChatMemberDTO& member) {
+            [&](const std::string& roomId, const ChatMemberDTO& member) {
                 std::cout << "\n>>> " << member.getUsername() << " joined " << roomId << "\n";
+                // Only store mapping in memory — DB record created lazily on first message
+                std::string key = roomId + ":" + member.getId();
+                peerUsernames[key] = member.getUsername();
             });
         QObject::connect(commController.get(), &CommunicationController::participantLeft,
             [](const std::string& roomId, const std::string& peerId) {
@@ -260,11 +242,58 @@ int main(int argc, char* argv[]) {
         auto connDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
         while (!wsConnected && std::chrono::steady_clock::now() < connDeadline)
             QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
-        if (!wsConnected)
-            std::cerr << "Warning: Could not connect to server within 5s.\n";
+        if (!wsConnected) {
+            std::cerr << "ERROR: Could not connect to signaling server at "
+                      << serverUrl << " within 5s.\n"
+                      << "Make sure the server is running. Chat/messaging features will not work.\n";
+        }
+
+        // Helper: persist queued incoming messages (called from main loop only)
+        auto flushIncoming = [&]() {
+            for (auto& msg : incomingQueue) {
+                try {
+                    std::string localChatId = findLocalChatId(ioc, chatService, msg.getChatId());
+                    if (localChatId.empty()) continue;
+
+                    // Lazy-create member for sender
+                    std::string senderMemberId;
+                    std::string peerKey = msg.getChatId() + ":" + msg.getSenderId();
+                    auto peerIt = peerMemberIds.find(peerKey);
+                    if (peerIt != peerMemberIds.end()) {
+                        senderMemberId = peerIt->second;
+                    } else {
+                        senderMemberId = boost::uuids::to_string(boost::uuids::random_generator()());
+                        ChatMemberDTO peerMember;
+                        peerMember.setId(senderMemberId);
+                        // Use remembered username if available, else fall back to peerId
+                        auto unIt = peerUsernames.find(peerKey);
+                        peerMember.setUsername(unIt != peerUsernames.end() ? unIt->second : msg.getSenderId());
+                        peerMember.setLastOnlineAt(TimePointConverter::toIsoString(std::chrono::system_clock::now()));
+                        run_and_wait(ioc, memberService->addMember(ChatMemberDTOConverter::fromDto(peerMember)));
+                        peerMemberIds[peerKey] = senderMemberId;
+                    }
+
+                    MessageDTO saveable;
+                    saveable.setId(boost::uuids::to_string(boost::uuids::random_generator()()));
+                    saveable.setChatId(localChatId);
+                    saveable.setSenderId(senderMemberId);
+                    saveable.setContent(msg.getContent());
+                    saveable.setDirection("incoming");
+                    saveable.setDeliveryState("delivered");
+                    saveable.setCreatedAt(msg.getCreatedAt().empty()
+                        ? TimePointConverter::toIsoString(std::chrono::system_clock::now())
+                        : msg.getCreatedAt());
+                    run_and_wait(ioc, messageService->addMessage(MessageDTOConverter::fromDto(saveable)));
+                } catch (const std::exception& e) {
+                    std::cerr << "[warn] Could not save incoming message: " << e.what() << "\n";
+                }
+            }
+            incomingQueue.clear();
+        };
 
         bool running = true;
         while (running) {
+            flushIncoming(); // persist any queued messages before showing menu
             std::cout << "\n=== Morze Console Client ===\n";
             std::cout << "1. List all chats\n";
             std::cout << "2. Join chat (create + connect)\n";
@@ -379,8 +408,10 @@ int main(int argc, char* argv[]) {
                             selfMember.setUsername(currentUsername);
                             selfMember.setLastOnlineAt(TimePointConverter::toIsoString(std::chrono::system_clock::now()));
                             run_and_wait(ioc, memberService->addMember(ChatMemberDTOConverter::fromDto(selfMember)));
-                        } catch (...) {}
-                        selfMemberIds[chatDTO.getRoomId()] = mid;
+                            selfMemberIds[chatDTO.getRoomId()] = mid;
+                        } catch (const std::exception& e) {
+                            std::cerr << "[warn] Could not create member: " << e.what() << "\n";
+                        }
                     }
 
                     commController->joinChat(chatDTO, currentUsername);
@@ -406,10 +437,15 @@ int main(int argc, char* argv[]) {
 
                 // Persist with local chat ID + self member ID (FK-safe)
                 try {
+                    auto selfIt = selfMemberIds.find(chatDTO.getRoomId());
+                    if (selfIt == selfMemberIds.end()) {
+                        std::cerr << "[warn] No self member record for room, skipping persistence.\n";
+                        continue;
+                    }
                     MessageDTO dbDTO;
                     dbDTO.setId(sendDTO.getId());
                     dbDTO.setChatId(chatDTO.getId());       // local chat UUID
-                    dbDTO.setSenderId(selfMemberIds[chatDTO.getRoomId()]); // self member UUID
+                    dbDTO.setSenderId(selfIt->second);      // self member UUID
                     dbDTO.setContent(content);
                     dbDTO.setDirection("outgoing");
                     dbDTO.setDeliveryState("delivered");

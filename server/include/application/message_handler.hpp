@@ -15,6 +15,7 @@ public:
   void handleDisconnect(const std::shared_ptr<domain::IConnection>& session);
 
 private:
+  void handleMessageImpl(const std::shared_ptr<domain::IConnection>& session, const std::string& raw);
   std::shared_ptr<domain::RoomRegistry> registry_;
 };
 
