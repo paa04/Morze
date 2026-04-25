@@ -118,7 +118,7 @@ target_compile_definitions(Boost_asio INTERFACE BOOST_ASIO_HAS_CO_AWAIT)
 
 
 
-find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets Gui Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets)
 
 add_executable(Morze main.cpp
         repositories/dbContext/Database.cpp
@@ -226,8 +226,6 @@ target_link_libraries(Morze PRIVATE
         Qt6::Core
         Qt6::Network
         Qt6::WebSockets
-        Qt6::Gui
-        Qt6::Widgets
 )
 
 if(WIN32)
