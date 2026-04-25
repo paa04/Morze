@@ -24,7 +24,7 @@ jobs:
       - uses: lukka/get-cmake@latest
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -S server
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -S server
 
       - name: Build server
         run: cmake --build build --target signaling_server -j$(nproc)
