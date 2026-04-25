@@ -2,7 +2,7 @@ name: Team Speed Dashboard
 
 on:
   push:
-    branches: [main, develop, KAN-33-team-speed]
+    branches: ['**']
   workflow_dispatch:
 
 permissions:
