@@ -87,7 +87,18 @@ add_boost_library(uuid              https://github.com/boostorg/uuid            
 add_boost_library(asio              https://github.com/boostorg/asio            boost-1.90.0)
 add_boost_library(beast             https://github.com/boostorg/beast           boost-1.90.0)
 
-find_package(nlohmann_json 3.11 REQUIRED)
+find_package(nlohmann_json 3.11 QUIET)
+if(NOT nlohmann_json_FOUND)
+    message(STATUS "System nlohmann_json not found, fetching from source...")
+    FetchContent_Declare(
+            json
+            GIT_REPOSITORY https://github.com/nlohmann/json.git
+            GIT_TAG v3.11.3
+    )
+    FetchContent_MakeAvailable(json)
+else()
+    message(STATUS "Using system nlohmann_json")
+endif()
 
 target_link_libraries(Boost_uuid INTERFACE
         Boost_config Boost_core Boost_assert Boost_throw_exception
