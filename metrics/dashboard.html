@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Morze - Team Speed Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#1a1a2e; color:#eee; font-family:'Segoe UI',sans-serif; padding:20px; }
+  h1 { text-align:center; margin-bottom:10px; color:#a78bfa; }
+  .subtitle { text-align:center; color:#888; margin-bottom:24px; }
+  .stats { display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
+  .stat { flex:1; min-width:140px; background:#16213e; border-radius:12px; padding:20px; text-align:center; }
+  .stat .value { font-size:2.2em; font-weight:700; color:#a78bfa; }
+  .stat .label { font-size:0.85em; color:#999; margin-top:4px; }
+  .grid { display:grid; grid-template-columns:2fr 1fr; gap:20px; margin-bottom:20px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+  .full { margin-bottom:20px; }
+  .card { background:#16213e; border-radius:12px; padding:20px; }
+  .card h2 { font-size:1.1em; color:#ccc; margin-bottom:12px; }
+  canvas { max-height:320px; }
+  table { width:100%; border-collapse:collapse; font-size:0.9em; }
+  th,td { padding:8px 12px; text-align:left; border-bottom:1px solid #2a2a4a; }
+  th { color:#a78bfa; }
+</style>
+</head>
+<body>
+<h1>Morze - Team Speed Dashboard</h1>
+<p class="subtitle">Метрики скорости разработки команды</p>
+
+<div class="stats" id="stats"></div>
+
+<div class="grid">
+  <div class="card"><h2>Commits per Day</h2><canvas id="dailyChart"></canvas></div>
+  <div class="card"><h2>Commits by Author</h2><canvas id="authorPie"></canvas></div>
+</div>
+
+<div class="grid2">
+  <div class="card"><h2>LOC by Author (Insertions / Deletions)</h2><canvas id="locChart"></canvas></div>
+  <div class="card"><h2>Code Churn %</h2><canvas id="churnChart"></canvas></div>
+</div>
+
+<div class="full card"><h2>Commits per Week per Author</h2><canvas id="weeklyChart"></canvas></div>
+
+<div class="grid2">
+  <div class="card"><h2>Pull Requests Merged</h2><table id="prTable"><thead><tr><th>PR</th><th>Branch</th><th>Merged</th></tr></thead><tbody></tbody></table></div>
+  <div class="card"><h2>Hot Files (Most Changed)</h2><canvas id="hotChart"></canvas></div>
+</div>
+
+<script>
+const COLORS = ['#a78bfa','#f472b6','#34d399','#fbbf24','#60a5fa','#fb923c','#e879f9'];
+
+async function load(name) {
+  const r = await fetch('data/' + name);
+  return r.json();
+}
+
+async function init() {
+  const [summary, daily, authors, loc, prs, hot, weekly] = await Promise.all([
+    load('summary.json'), load('commits_daily.json'), load('commits_by_author.json'),
+    load('loc_by_author.json'), load('pull_requests.json'), load('hot_files.json'),
+    load('commits_weekly.json')
+  ]);
+  const s = summary[0];
+
+  // Stats
+  const statData = [
+    ['Commits', s.total_commits], ['PRs Merged', s.total_prs],
+    ['Authors', s.total_authors], ['LOC Net', s.loc_net.toLocaleString()],
+    ['Commits/Week', s.commits_per_week], ['PRs/Week', s.prs_per_week],
+    ['Weeks', s.project_weeks]
+  ];
+  document.getElementById('stats').innerHTML = statData.map(([l,v]) =>
+    `<div class="stat"><div class="value">${v}</div><div class="label">${l}</div></div>`
+  ).join('');
+
+  // Daily commits
+  new Chart(document.getElementById('dailyChart'), {
+    type:'bar',
+    data:{ labels:daily.map(d=>d.date), datasets:[{label:'Commits',data:daily.map(d=>d.commits),backgroundColor:'#a78bfa'}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#888'}},y:{ticks:{color:'#888'}}}}
+  });
+
+  // Author pie
+  new Chart(document.getElementById('authorPie'), {
+    type:'doughnut',
+    data:{ labels:authors.map(a=>a.author), datasets:[{data:authors.map(a=>a.commits),backgroundColor:COLORS}]},
+    options:{plugins:{legend:{position:'bottom',labels:{color:'#ccc'}}}}
+  });
+
+  // LOC bar
+  new Chart(document.getElementById('locChart'), {
+    type:'bar',
+    data:{ labels:loc.map(l=>l.author), datasets:[
+      {label:'Insertions',data:loc.map(l=>l.insertions),backgroundColor:'#34d399'},
+      {label:'Deletions',data:loc.map(l=>l.deletions),backgroundColor:'#f87171'}
+    ]},
+    options:{scales:{x:{ticks:{color:'#888'}},y:{ticks:{color:'#888'}}},plugins:{legend:{labels:{color:'#ccc'}}}}
+  });
+
+  // Churn gauge (horizontal bar)
+  new Chart(document.getElementById('churnChart'), {
+    type:'bar',
+    data:{ labels:loc.map(l=>l.author), datasets:[{label:'Churn %',data:loc.map(l=>l.churn_pct),
+      backgroundColor:loc.map(l=>l.churn_pct>60?'#f87171':l.churn_pct>30?'#fbbf24':'#34d399')}]},
+    options:{indexAxis:'y',scales:{x:{max:100,ticks:{color:'#888'}},y:{ticks:{color:'#888'}}},plugins:{legend:{display:false}}}
+  });
+
+  // Weekly stacked
+  const weeks = [...new Set(weekly.map(w=>w.week))].sort();
+  const wAuthors = [...new Set(weekly.map(w=>w.author))];
+  new Chart(document.getElementById('weeklyChart'), {
+    type:'bar',
+    data:{ labels:weeks, datasets: wAuthors.map((a,i) => ({
+      label:a, data:weeks.map(w => {const e=weekly.find(x=>x.week===w&&x.author===a); return e?e.commits:0;}),
+      backgroundColor:COLORS[i%COLORS.length]
+    }))},
+    options:{scales:{x:{stacked:true,ticks:{color:'#888'}},y:{stacked:true,ticks:{color:'#888'}}},plugins:{legend:{labels:{color:'#ccc'}}}}
+  });
+
+  // PR table
+  const tbody = document.querySelector('#prTable tbody');
+  prs.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>#${p.pr}</td><td>${p.branch}</td><td>${p.merged}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Hot files
+  const topHot = hot.slice(0, 10);
+  new Chart(document.getElementById('hotChart'), {
+    type:'bar',
+    data:{ labels:topHot.map(h=>h.file.split('/').pop()), datasets:[{label:'Changes',data:topHot.map(h=>h.changes),backgroundColor:'#fb923c'}]},
+    options:{indexAxis:'y',scales:{x:{ticks:{color:'#888'}},y:{ticks:{color:'#888',font:{size:10}}}},plugins:{legend:{display:false}}}
+  });
+}
+init();
+</script>
+</body>
+</html>
