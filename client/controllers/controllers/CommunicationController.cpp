@@ -126,7 +126,11 @@ void CommunicationController::onSignalingJoined(const QString& roomId, const QSt
 {
     std::string roomIdStr = roomId.toStdString();
     auto it = m_rooms.find(roomIdStr);
-    if (it == m_rooms.end()) return;
+    if (it == m_rooms.end()) {
+        std::cout << "[WARN] onSignalingJoined: room " << roomIdStr << " not in m_rooms, ignoring\n";
+        std::cout.flush();
+        return;
+    }
 
     it->second.myPeerId = peerId.toStdString();
     it->second.roomType = roomType.toStdString();
