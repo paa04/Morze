@@ -1,12 +1,17 @@
 #include "DependencyContainer.h"
 
+#include <boost/asio/co_spawn.hpp>
+#include <boost/asio/detached.hpp>
 #include <thread>
 
-DependencyContainer::DependencyContainer(const std::string& configPath)
+DependencyContainer::DependencyContainer(const std::string& configPath, const std::string& dbPathOverride)
     : configPath_(configPath)
-    , ioc_(std::thread::hardware_concurrency()) // пул потоков
+    , ioc_(std::thread::hardware_concurrency())
 {
     config_ = std::make_unique<ConfigManager>(ConfigManager::loadFromFile(configPath));
+    if (!dbPathOverride.empty()) {
+        config_->setDatabasePath(dbPathOverride);
+    }
     initDatabase();
     initRepositories();
     initServices();
@@ -36,11 +41,6 @@ void DependencyContainer::applyStunServersFromProfile()
                 stunServers = config_->signaling().stun_urls;
             }
 
-            // Если конфиг тоже пуст — дефолтный
-            if (stunServers.empty()) {
-                stunServers.emplace_back("stun:stun.l.google.com:19302");
-            }
-
             webRTC_->setStunServers(stunServers);
             std::cout << "STUN servers configured (" << stunServers.size() << ")\n";
         } catch (const std::exception& e) {
@@ -64,6 +64,7 @@ void DependencyContainer::runIoContext()
 
 void DependencyContainer::stopIoContext()
 {
+    workGuard_.reset();
     ioc_.stop();
 }
 

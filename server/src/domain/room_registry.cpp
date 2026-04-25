@@ -15,8 +15,10 @@ namespace signaling::domain
     {
         auto now = std::chrono::system_clock::now();
         auto time = std::chrono::system_clock::to_time_t(now);
+        std::tm buf{};
+        gmtime_r(&time, &buf);
         std::ostringstream oss;
-        oss << std::put_time(std::gmtime(&time), "%Y-%m-%dT%H:%M:%SZ");
+        oss << std::put_time(&buf, "%Y-%m-%dT%H:%M:%SZ");
         return oss.str();
     }
 
@@ -114,6 +116,7 @@ namespace signaling::domain
         // Check for reconnection: existing member with same username
         auto members = store_->findMembersByRoom(roomId);
         std::string existingPeerId;
+        int64_t existingAckedSeq{0};
 
         for (const auto &m : members)
         {
@@ -127,6 +130,7 @@ namespace signaling::domain
                     return out;
                 }
                 existingPeerId = m.member_id;
+                existingAckedSeq = m.last_acked_msg_seq;
                 break;
             }
         }
@@ -164,9 +168,9 @@ namespace signaling::domain
         if (isReconnect)
         {
             out.peerId = existingPeerId;
-            // Update last_online_at
+            // Update last_online_at, preserve ack cursor
             store_->saveMember(RoomMemberRecord{
-                existingPeerId, username, now, roomId
+                existingPeerId, username, now, roomId, existingAckedSeq
             });
         } else
         {
@@ -223,6 +227,14 @@ namespace signaling::domain
         {
             connections_.erase(connIt);
             error = "target peer is offline";
+            return std::nullopt;
+        }
+
+        // Verify target peer is in the same room
+        auto targetIt = clients_.find(target.get());
+        if (targetIt == clients_.end() || targetIt->second.roomId != roomId)
+        {
+            error = "target peer is not in this room";
             return std::nullopt;
         }
 

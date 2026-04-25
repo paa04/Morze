@@ -2,7 +2,7 @@
 #define MORZE_CHATDTOCONVERTER_H
 
 #include "ChatModel.h"
-#include "ChatDto.h"
+#include "ChatDTO.h"
 #include "UUIDConverter.h"
 #include "TimePointConverter.h"
 #include "ChatTypeConverter.h"

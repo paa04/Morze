@@ -26,6 +26,9 @@ public:
     // Отправить сообщение через DataChannel
     void sendMessage(const QString &peerId, const QByteArray &data);
 
+    // Проверить готовность DataChannel
+    bool isDataChannelOpen(const QString &peerId) const;
+
     // Закрыть соединение
     void closeConnection(const QString &peerId);
 

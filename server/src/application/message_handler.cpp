@@ -214,6 +214,9 @@ namespace signaling::application
                 broadcast_res->roomId, broadcast_res->fromPeerId,
                 broadcast_res->messageSeq, boost::json::value(payloadIt->value()));
 
+            // Send to sender so they know the assigned messageSeq
+            session->sendText(toText(message));
+
             for (const auto& member_conn : broadcast_res->recipients)
                 member_conn->sendText(toText(message));
 

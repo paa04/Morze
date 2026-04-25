@@ -77,11 +77,15 @@ private:
     void setupWebRtcForPeer(const std::string& roomId, const std::string& peerId);
     void ensureWebRtcConnection(const std::string& roomId, const std::string& peerId);
 
+    void flushPendingMessages(const std::string& peerId);
+
     SignalingService *m_signaling;
     WebRTCService *m_webRTC;
 
     std::unordered_map<std::string, RoomState> m_rooms; // roomId -> состояние
     std::unordered_map<std::string, std::string> m_peerToRoom; // peerId -> roomId
+    // peerId -> queued messages waiting for DataChannel to open
+    std::unordered_map<std::string, std::vector<QByteArray>> m_pendingMessages;
 
     std::string m_currentServerUrl;
     std::string m_currentStunUrl;

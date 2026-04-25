@@ -52,6 +52,10 @@ namespace signaling::infrastructure {
     }
 
     void Listener::onAccept(beast::error_code ec, tcp::socket socket) {
+        if (ec == asio::error::operation_aborted) {
+            return;
+        }
+
         if (!ec) {
             std::make_shared<WsSession>(std::move(socket), handler_)->run();
         }

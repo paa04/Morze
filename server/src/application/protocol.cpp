@@ -154,7 +154,9 @@ namespace signaling::application::protocol
             json::object msg;
             msg["messageSeq"] = m.seq;
             msg["fromPeerId"] = m.fromPeerId;
-            msg["payload"] = json::parse(m.payload);
+            boost::system::error_code ec;
+            auto parsed = json::parse(m.payload, ec);
+            msg["payload"] = ec ? json::value(m.payload) : parsed;
             msg["createdAt"] = m.createdAt;
             arr.push_back(std::move(msg));
         }

@@ -30,6 +30,8 @@ public:
     const Logging& logging() const { return logging_; }
     const Signaling& signaling() const { return signaling_; }
 
+    void setDatabasePath(const std::string& path) { database_.path = path; }
+
 private:
     Database database_;
     Logging logging_;

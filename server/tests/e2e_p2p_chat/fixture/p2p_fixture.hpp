@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 #include "../../../include/signaling_server.hpp"
+#include <thread>
 
 class TestFixtureP2p: public ::testing::Test
 {

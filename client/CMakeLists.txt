@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.1)
+cmake_minimum_required(VERSION 3.20)
 project(Morze)
 include(FetchContent)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -42,7 +42,9 @@ set(BOOST_JSON_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(BOOST_JSON_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 function(add_boost_library NAME REPO TAG)
-    cmake_policy(SET CMP0169 OLD)
+    if(POLICY CMP0169)
+        cmake_policy(SET CMP0169 OLD)
+    endif()
     FetchContent_Declare(
             boost_${NAME}
             GIT_REPOSITORY ${REPO}

@@ -247,4 +247,44 @@ if (BUILD_TESTING)
   )
   set_tests_properties(group_chat_e2e_buffered_messages PROPERTIES LABELS e2e)
 
+  # --- e2e: real client integration tests (requires Qt6) ---
+  set(CLIENT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../client)
+  find_package(Qt6 QUIET COMPONENTS Core Network WebSockets)
+
+  if (Qt6_FOUND AND EXISTS "${CLIENT_DIR}/services/services/SignalingService.cpp")
+    add_executable(client_e2e_tests
+      tests/e2e_client/main.cpp
+      tests/e2e_client/fixture/client_e2e_fixture.cpp
+      tests/e2e_client/signaling_service_tests.cpp
+      tests/e2e_client/communication_controller_tests.cpp
+      ${CLIENT_DIR}/services/services/SignalingService.cpp
+      ${CLIENT_DIR}/services/services/WebRTCService.cpp
+      ${CLIENT_DIR}/controllers/controllers/CommunicationController.cpp
+    )
+
+    set_target_properties(client_e2e_tests PROPERTIES AUTOMOC ON)
+
+    target_include_directories(client_e2e_tests PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/include
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e_client
+      ${CLIENT_DIR}/services/services
+      ${CLIENT_DIR}/controllers/controllers
+      ${CLIENT_DIR}/controllers/DTO
+    )
+
+    target_link_directories(client_e2e_tests PRIVATE /usr/local/lib)
+
+    target_link_libraries(client_e2e_tests PRIVATE
+      signaling_core
+      GTest::gtest
+      Qt6::Core
+      Qt6::Network
+      Qt6::WebSockets
+      datachannel
+    )
+
+    target_compile_options(client_e2e_tests PRIVATE -Wall -Wextra -Wpedantic)
+    gtest_discover_tests(client_e2e_tests)
+  endif()
+
 endif()

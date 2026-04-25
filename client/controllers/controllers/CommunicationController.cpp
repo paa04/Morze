@@ -1,4 +1,5 @@
 #include "CommunicationController.h"
+#include "TimePointConverter.h"
 
 CommunicationController::CommunicationController(SignalingService *signaling,
                                                  WebRTCService *webRTC,
@@ -137,6 +138,9 @@ void CommunicationController::onSignalingPeerJoined(const QString& roomId, const
 
     emit participantJoined(roomIdStr, member);
 
+    std::cout << "[DEBUG] peerJoined: roomType=" << it->second.roomType
+              << " peer=" << peerIdStr << " myPeer=" << it->second.myPeerId << "\n";
+    std::cout.flush();
     if (it->second.roomType == "direct" && peerIdStr != it->second.myPeerId) {
         setupWebRtcForPeer(roomIdStr, peerIdStr);
     }
@@ -178,7 +182,7 @@ void CommunicationController::onSignalingGroupMessageReceived(const QString& roo
     msg.setChatId(roomId.toStdString());
     msg.setSenderId(fromPeerId.toStdString());
     msg.setContent(payload["text"].toString().toStdString());
-    msg.setCreatedAt(std::to_string(std::chrono::system_clock::now().time_since_epoch().count()));
+    msg.setCreatedAt(TimePointConverter::toIsoString(std::chrono::system_clock::now()));
     msg.setDirection("incoming");
     msg.setDeliveryState("delivered");
 
@@ -203,7 +207,10 @@ void CommunicationController::onSignalingErrorReceived(const QString& error)
 }
 
 // --- WebRTC ---
-void CommunicationController::onWebRtcConnectionOpened(const QString& peerId) {}
+void CommunicationController::onWebRtcConnectionOpened(const QString& peerId) {
+    std::cout << "\n>>> P2P connection opened with " << peerId.toStdString() << "\n";
+    flushPendingMessages(peerId.toStdString());
+}
 void CommunicationController::onWebRtcConnectionClosed(const QString& peerId) {}
 
 void CommunicationController::onWebRtcMessageReceived(const QString& peerId, const QByteArray& data)
@@ -217,7 +224,7 @@ void CommunicationController::onWebRtcMessageReceived(const QString& peerId, con
     msg.setContent(data.toStdString());
     msg.setDirection("incoming");
     msg.setDeliveryState("delivered");
-    msg.setCreatedAt(std::to_string(std::chrono::system_clock::now().time_since_epoch().count()));
+    msg.setCreatedAt(TimePointConverter::toIsoString(std::chrono::system_clock::now()));
 
     emit messageReceived(msg);
 }
@@ -261,8 +268,26 @@ void CommunicationController::handleDirectMessage(const MessageDTO& msg)
     }
 
     ensureWebRtcConnection(msg.getChatId(), targetPeerId);
-    m_webRTC->sendMessage(QString::fromStdString(targetPeerId), QByteArray::fromStdString(msg.getContent()));
+
+    QByteArray data = QByteArray::fromStdString(msg.getContent());
+    // Queue message — will be sent when DataChannel opens (or immediately if already open)
+    m_pendingMessages[targetPeerId].push_back(data);
+    flushPendingMessages(targetPeerId);
     emit messageDelivered(msg.getId());
+}
+
+void CommunicationController::flushPendingMessages(const std::string& peerId)
+{
+    auto it = m_pendingMessages.find(peerId);
+    if (it == m_pendingMessages.end() || it->second.empty()) return;
+
+    if (!m_webRTC->isDataChannelOpen(QString::fromStdString(peerId)))
+        return; // DC not ready yet — keep messages queued
+
+    for (auto& data : it->second) {
+        m_webRTC->sendMessage(QString::fromStdString(peerId), data);
+    }
+    it->second.clear();
 }
 
 void CommunicationController::handleGroupMessage(const MessageDTO& msg)
@@ -274,10 +299,13 @@ void CommunicationController::handleGroupMessage(const MessageDTO& msg)
 
 void CommunicationController::setupWebRtcForPeer(const std::string& roomId, const std::string& peerId)
 {
+    std::cout << "[DEBUG] setupWebRtcForPeer: room=" << roomId << " peer=" << peerId << "\n";
+    std::cout.flush();
     m_webRTC->initiateConnection(QString::fromStdString(roomId), QString::fromStdString(peerId));
 }
 
 void CommunicationController::ensureWebRtcConnection(const std::string& roomId, const std::string& peerId)
 {
+    // initiateConnection returns early if connection already exists
     m_webRTC->initiateConnection(QString::fromStdString(roomId), QString::fromStdString(peerId));
 }
