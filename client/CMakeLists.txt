@@ -233,6 +233,12 @@ target_link_libraries(Morze PRIVATE
         Qt6::WebSockets
 )
 
+# Copy config.json next to the binary so it's always found
+add_custom_command(TARGET Morze POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/config.json
+        $<TARGET_FILE_DIR:Morze>/config.json)
+
 if(WIN32)
     target_link_libraries(Morze PRIVATE ws2_32)
 endif()
