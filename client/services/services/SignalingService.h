@@ -59,6 +59,10 @@ private:
     QWebSocket *m_socket;
     QUrl m_serverUrl;
     bool m_manualDisconnect = false;
+    int m_reconnectAttempts = 0;
+    static constexpr int kMaxReconnectAttempts = 10;
+    static constexpr int kBaseReconnectMs = 500;
+    static constexpr int kMaxReconnectMs = 30000;
 };
 
 #endif // SIGNALINGSERVICE_H

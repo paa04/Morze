@@ -207,7 +207,7 @@ namespace {
         std::string error;
         auto badLeave = registry.leave(c1, std::make_optional<std::string>("room-2"), j1.peerId, error);
         EXPECT_FALSE(badLeave.hadMembership);
-        EXPECT_EQ(error, "roomId does not match active session room");
+        EXPECT_EQ(error, "roomId/peerId does not match any active session room");
 
         error.clear();
         auto leave = registry.leave(c1, std::make_optional<std::string>("room-1"), j1.peerId, error);
@@ -254,10 +254,11 @@ namespace {
         ASSERT_TRUE(j1.ok);
         ASSERT_TRUE(j2.ok);
 
-        auto disc = registry.disconnect(c1);
-        EXPECT_TRUE(disc.hadMembership);
-        EXPECT_EQ(disc.peerId, j1.peerId);
-        EXPECT_EQ(disc.peersToNotify.size(), 1U);
+        auto discs = registry.disconnect(c1);
+        ASSERT_EQ(discs.size(), 1U);
+        EXPECT_TRUE(discs[0].hadMembership);
+        EXPECT_EQ(discs[0].peerId, j1.peerId);
+        EXPECT_EQ(discs[0].peersToNotify.size(), 1U);
 
         // Alice is offline but still a member in DB
         EXPECT_TRUE(store->findMember(j1.peerId).has_value());

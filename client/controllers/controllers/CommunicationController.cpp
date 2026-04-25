@@ -138,10 +138,9 @@ void CommunicationController::onSignalingPeerJoined(const QString& roomId, const
 
     emit participantJoined(roomIdStr, member);
 
-    std::cout << "[DEBUG] peerJoined: roomType=" << it->second.roomType
-              << " peer=" << peerIdStr << " myPeer=" << it->second.myPeerId << "\n";
-    std::cout.flush();
-    if (it->second.roomType == "direct" && peerIdStr != it->second.myPeerId) {
+    if (it->second.roomType == "direct"
+        && !it->second.myPeerId.empty()
+        && peerIdStr != it->second.myPeerId) {
         setupWebRtcForPeer(roomIdStr, peerIdStr);
     }
 }
@@ -208,7 +207,6 @@ void CommunicationController::onSignalingErrorReceived(const QString& error)
 
 // --- WebRTC ---
 void CommunicationController::onWebRtcConnectionOpened(const QString& peerId) {
-    std::cout << "\n>>> P2P connection opened with " << peerId.toStdString() << "\n";
     flushPendingMessages(peerId.toStdString());
 }
 void CommunicationController::onWebRtcConnectionClosed(const QString& peerId) {}
@@ -271,7 +269,12 @@ void CommunicationController::handleDirectMessage(const MessageDTO& msg)
 
     QByteArray data = QByteArray::fromStdString(msg.getContent());
     // Queue message — will be sent when DataChannel opens (or immediately if already open)
-    m_pendingMessages[targetPeerId].push_back(data);
+    auto &queue = m_pendingMessages[targetPeerId];
+    if (queue.size() >= 1000) {
+        emit errorOccurred("Message queue full for peer " + targetPeerId + ", dropping oldest");
+        queue.erase(queue.begin());
+    }
+    queue.push_back(data);
     flushPendingMessages(targetPeerId);
     emit messageDelivered(msg.getId());
 }
@@ -299,8 +302,6 @@ void CommunicationController::handleGroupMessage(const MessageDTO& msg)
 
 void CommunicationController::setupWebRtcForPeer(const std::string& roomId, const std::string& peerId)
 {
-    std::cout << "[DEBUG] setupWebRtcForPeer: room=" << roomId << " peer=" << peerId << "\n";
-    std::cout.flush();
     m_webRTC->initiateConnection(QString::fromStdString(roomId), QString::fromStdString(peerId));
 }
 

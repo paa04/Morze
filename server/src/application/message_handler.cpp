@@ -270,17 +270,15 @@ namespace signaling::application
     void MessageHandler::handleDisconnect(const std::shared_ptr<domain::IConnection> &session)
     {
         try {
-            auto result = registry_->disconnect(session);
-            if (!result.hadMembership)
-            {
-                return;
-            }
+            auto results = registry_->disconnect(session);
 
-            // Notify peers that this member went offline (not "left" — they're still a member)
-            const auto leftMsg = toText(protocol::makePeerLeft(result.roomId, result.peerId));
-            for (const auto &peer: result.peersToNotify)
+            for (const auto &result : results)
             {
-                peer->sendText(leftMsg);
+                const auto leftMsg = toText(protocol::makePeerLeft(result.roomId, result.peerId));
+                for (const auto &peer: result.peersToNotify)
+                {
+                    peer->sendText(leftMsg);
+                }
             }
         } catch (const std::exception &ex) {
             std::cerr << "[ERROR] handleDisconnect exception: " << ex.what() << "\n";

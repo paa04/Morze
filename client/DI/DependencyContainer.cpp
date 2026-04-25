@@ -98,7 +98,8 @@ void DependencyContainer::initServices()
 void DependencyContainer::initNetworkServices()
 {
     signaling_ = std::make_shared<SignalingService>();
-    webRTC_ = std::make_shared<WebRTCService>();
+    // Set STUN from config synchronously so it's ready before any connection
+    webRTC_ = std::make_shared<WebRTCService>(config_->signaling().stun_urls);
 }
 
 void DependencyContainer::initControllers()
