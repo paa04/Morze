@@ -21,11 +21,17 @@ TOKEN    = os.environ.get("JIRA_API_TOKEN", "")
 PROJECT  = os.environ.get("JIRA_PROJECT_KEY", "KAN")
 OUT_DIR  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
-if not all([BASE_URL, EMAIL, TOKEN]):
-    print("JIRA credentials not set, skipping JIRA metrics", file=sys.stderr)
-    # Write empty data so dashboard doesn't break
+def write_empty():
     os.makedirs(OUT_DIR, exist_ok=True)
-    json.dump([], open(os.path.join(OUT_DIR, "lead_time.json"), "w"))
+    with open(os.path.join(OUT_DIR, "lead_time.json"), "w") as f:
+        json.dump([], f)
+
+if not all([BASE_URL, EMAIL, TOKEN]):
+    print("JIRA credentials not set, skipping JIRA metrics")
+    print(f"  JIRA_BASE_URL={'set' if BASE_URL else 'EMPTY'}")
+    print(f"  JIRA_USER_EMAIL={'set' if EMAIL else 'EMPTY'}")
+    print(f"  JIRA_API_TOKEN={'set' if TOKEN else 'EMPTY'}")
+    write_empty()
     sys.exit(0)
 
 AUTH = b64encode(f"{EMAIL}:{TOKEN}".encode()).decode()
@@ -52,9 +58,14 @@ def jira_get(path, params=None):
     url = BASE_URL + path
     if params:
         url += "?" + urlencode(params)
+    print(f"  GET {url[:80]}...")
     req = Request(url, headers=HEADERS)
-    with urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read())
+    try:
+        with urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read())
+    except Exception as e:
+        print(f"  JIRA API error: {e}", file=sys.stderr)
+        raise
 
 def fetch_all_issues():
     """Fetch all issues from project with changelog."""
@@ -195,4 +206,9 @@ def main():
     print(f"  lead_time.json: {len(result)} months")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"JIRA collection failed: {e}", file=sys.stderr)
+        write_empty()
+        sys.exit(0)  # don't fail the whole pipeline
