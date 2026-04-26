@@ -262,7 +262,12 @@ endif()
 # ------------------- GUI подпроект -------------------
 option(BUILD_GUI_SUBPROJECT "Build Qt Quick GUI subproject" ON)
 if(BUILD_GUI_SUBPROJECT)
-    add_subdirectory(gui)
+    find_package(Qt6 QUIET COMPONENTS Quick)
+    if(Qt6Quick_FOUND)
+        add_subdirectory(gui)
+    else()
+        message(STATUS "Qt6Quick not found — skipping GUI subproject")
+    endif()
 endif()
 
 # ------------------- Тесты -------------------
