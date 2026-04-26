@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 project(Morze)
 include(FetchContent)
+if(POLICY CMP0169)
+    cmake_policy(SET CMP0169 OLD)
+endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -12,15 +15,44 @@ set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/qt6" CACHE PATH "Qt6 prefix pat
 FetchContent_Declare(
         sqlite3
         URL https://www.sqlite.org/2026/sqlite-amalgamation-3530000.zip
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(sqlite3)
+set(SQLITE3_C_FILE "${sqlite3_SOURCE_DIR}/sqlite3.c")
+if(NOT EXISTS "${SQLITE3_C_FILE}")
+    file(GLOB SQLITE3_C_CANDIDATES "${sqlite3_SOURCE_DIR}/*/sqlite3.c")
+    list(LENGTH SQLITE3_C_CANDIDATES SQLITE3_C_COUNT)
+    if(SQLITE3_C_COUNT GREATER 0)
+        list(GET SQLITE3_C_CANDIDATES 0 SQLITE3_C_FILE)
+    endif()
+endif()
+if(NOT EXISTS "${SQLITE3_C_FILE}")
+    message(FATAL_ERROR "sqlite3.c not found in fetched sqlite3 sources: ${sqlite3_SOURCE_DIR}")
+endif()
+add_library(sqlite3 STATIC "${SQLITE3_C_FILE}")
+get_filename_component(SQLITE3_INCLUDE_DIR "${SQLITE3_C_FILE}" DIRECTORY)
+target_include_directories(sqlite3 PUBLIC "${SQLITE3_INCLUDE_DIR}")
 
 FetchContent_Declare(
         sqlite_orm
         GIT_REPOSITORY https://github.com/fnc12/sqlite_orm.git
         GIT_TAG        v1.9.1 # Или любой другой тег/коммит, который вы предпочитаете
 )
-FetchContent_MakeAvailable(sqlite_orm)
+FetchContent_GetProperties(sqlite_orm)
+if(NOT sqlite_orm_POPULATED)
+    FetchContent_Populate(sqlite_orm)
+endif()
+add_library(sqlite_orm INTERFACE)
+target_include_directories(sqlite_orm INTERFACE ${sqlite_orm_SOURCE_DIR}/include)
+add_library(sqlite_orm::sqlite_orm ALIAS sqlite_orm)
+
+if(WIN32 AND NOT DEFINED OPENSSL_ROOT_DIR)
+    # Стандартный путь OpenSSL для MSYS2 MinGW64.
+    set(OPENSSL_ROOT_DIR "C:/msys64/mingw64" CACHE PATH "OpenSSL root directory")
+endif()
+if(WIN32)
+    set(OPENSSL_USE_STATIC_LIBS FALSE CACHE BOOL "Use dynamic OpenSSL libs" FORCE)
+endif()
 
 find_package(LibDataChannel QUIET)
 if(NOT LibDataChannel_FOUND)
@@ -49,43 +81,18 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(cpm)
 
-set(BOOST_JSON_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(BOOST_JSON_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-
-function(add_boost_library NAME REPO TAG)
-    if(POLICY CMP0169)
-        cmake_policy(SET CMP0169 OLD)
-    endif()
-    FetchContent_Declare(
-            boost_${NAME}
-            GIT_REPOSITORY ${REPO}
-            GIT_TAG ${TAG}
-            GIT_SHALLOW TRUE
-    )
-    FetchContent_GetProperties(boost_${NAME})
-    if(NOT boost_${NAME}_POPULATED)
-        FetchContent_Populate(boost_${NAME})
-    endif()
-    add_library(Boost_${NAME} INTERFACE)
-    target_include_directories(Boost_${NAME} INTERFACE ${boost_${NAME}_SOURCE_DIR}/include)
-    add_library(Boost::${NAME} ALIAS Boost_${NAME})
-endfunction()
-
-# Явно добавляем каждую необходимую библиотеку Boost
-add_boost_library(config            https://github.com/boostorg/config          boost-1.90.0)
-add_boost_library(core              https://github.com/boostorg/core            boost-1.90.0)
-add_boost_library(assert            https://github.com/boostorg/assert          boost-1.90.0)
-add_boost_library(throw_exception   https://github.com/boostorg/throw_exception boost-1.90.0)
-add_boost_library(move              https://github.com/boostorg/move            boost-1.90.0)
-add_boost_library(type_traits       https://github.com/boostorg/type_traits     boost-1.90.0)
-add_boost_library(predef            https://github.com/boostorg/predef          boost-1.90.0)
-add_boost_library(static_assert     https://github.com/boostorg/static_assert   boost-1.90.0)
-add_boost_library(winapi            https://github.com/boostorg/winapi          boost-1.90.0)
-add_boost_library(detail            https://github.com/boostorg/detail          boost-1.90.0)
-add_boost_library(system            https://github.com/boostorg/system          boost-1.90.0)
-add_boost_library(uuid              https://github.com/boostorg/uuid            boost-1.90.0)
-add_boost_library(asio              https://github.com/boostorg/asio            boost-1.90.0)
-add_boost_library(beast             https://github.com/boostorg/beast           boost-1.90.0)
+FetchContent_Declare(
+        boost_headers
+        URL https://archives.boost.io/release/1.90.0/source/boost_1_90_0.tar.gz
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(boost_headers)
+add_library(Boost_headers INTERFACE)
+target_include_directories(Boost_headers INTERFACE ${boost_headers_SOURCE_DIR})
+target_compile_definitions(Boost_headers INTERFACE BOOST_ASIO_STANDALONE BOOST_ASIO_HAS_CO_AWAIT)
+add_library(Boost::uuid ALIAS Boost_headers)
+add_library(Boost::asio ALIAS Boost_headers)
+add_library(Boost::beast ALIAS Boost_headers)
 
 find_package(nlohmann_json 3.11 QUIET)
 if(NOT nlohmann_json_FOUND)
@@ -105,21 +112,7 @@ else()
     message(STATUS "Using system nlohmann_json")
 endif()
 
-target_link_libraries(Boost_uuid INTERFACE
-        Boost_config Boost_core Boost_assert Boost_throw_exception
-        Boost_move Boost_type_traits Boost_predef Boost_static_assert
-        Boost_winapi Boost_detail
-)
-
-target_link_libraries(Boost_asio INTERFACE
-        Boost_config Boost_core Boost_assert Boost_system Boost_throw_exception
-        Boost_predef Boost_detail
-)
-
-
-# Настройки для Asio (теперь цель Boost_asio уже создана)
-target_compile_definitions(Boost_asio INTERFACE BOOST_ASIO_STANDALONE)
-target_compile_definitions(Boost_asio INTERFACE BOOST_ASIO_HAS_CO_AWAIT)
+# Boost headers-only target настроен выше.
 
 
 
@@ -241,6 +234,35 @@ add_custom_command(TARGET Morze POST_BUILD
 
 if(WIN32)
     target_link_libraries(Morze PRIVATE ws2_32)
+
+    # Runtime OpenSSL DLLs needed by libdatachannel on Windows.
+    set(_MORZE_OPENSSL_DIRS "")
+    if(DEFINED OPENSSL_ROOT_DIR AND NOT OPENSSL_ROOT_DIR STREQUAL "")
+        list(APPEND _MORZE_OPENSSL_DIRS "${OPENSSL_ROOT_DIR}/bin" "${OPENSSL_ROOT_DIR}/lib")
+    endif()
+    list(APPEND _MORZE_OPENSSL_DIRS "C:/msys64/mingw64/bin")
+    list(REMOVE_DUPLICATES _MORZE_OPENSSL_DIRS)
+
+    foreach(_MORZE_SSL_DIR IN LISTS _MORZE_OPENSSL_DIRS)
+        if(EXISTS "${_MORZE_SSL_DIR}/libssl-3-x64.dll")
+            add_custom_command(TARGET Morze POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${_MORZE_SSL_DIR}/libssl-3-x64.dll"
+                $<TARGET_FILE_DIR:Morze>/libssl-3-x64.dll)
+        endif()
+        if(EXISTS "${_MORZE_SSL_DIR}/libcrypto-3-x64.dll")
+            add_custom_command(TARGET Morze POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${_MORZE_SSL_DIR}/libcrypto-3-x64.dll"
+                $<TARGET_FILE_DIR:Morze>/libcrypto-3-x64.dll)
+        endif()
+    endforeach()
+endif()
+
+# ------------------- GUI подпроект -------------------
+option(BUILD_GUI_SUBPROJECT "Build Qt Quick GUI subproject" ON)
+if(BUILD_GUI_SUBPROJECT)
+    add_subdirectory(gui)
 endif()
 
 # ------------------- Тесты -------------------

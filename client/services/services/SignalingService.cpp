@@ -1,6 +1,7 @@
 #include "SignalingService.h"
 #include <QTimer>
 #include <QJsonDocument>
+#include <QDebug>
 #include <iostream>
 
 SignalingService::SignalingService(QObject *parent)
@@ -24,11 +25,32 @@ SignalingService::~SignalingService()
 
 void SignalingService::connectToServer(const QUrl &url)
 {
-    m_serverUrl = url;
+    QUrl normalized = url;
+    // Railway production endpoints usually require TLS WebSocket.
+    if (normalized.host().endsWith("railway.app", Qt::CaseInsensitive)
+        && normalized.scheme().compare("ws", Qt::CaseInsensitive) == 0) {
+        normalized.setScheme("wss");
+        if (normalized.port() == 9001 || normalized.port() == -1) {
+            normalized.setPort(443);
+        }
+    }
+    m_serverUrl = normalized;
     m_manualDisconnect = false;
+    qInfo().noquote() << "[SignalingService] connectToServer:" << m_serverUrl.toString();
     if (m_socket->state() != QAbstractSocket::UnconnectedState)
         m_socket->close();
-    m_socket->open(url);
+    m_socket->open(m_serverUrl);
+
+    // Explicit timeout diagnostics: without this some network paths look "silent".
+    QTimer::singleShot(5000, this, [this]() {
+        if (m_socket->state() == QAbstractSocket::ConnectingState) {
+            const QString msg = QString("WebSocket connect timeout (5s) to %1. "
+                                        "Если это Railway — используйте wss://<host>[:443]")
+                                    .arg(m_serverUrl.toString());
+            qWarning().noquote() << "[SignalingService]" << msg;
+            emit errorOccurred(msg);
+        }
+    });
 }
 
 void SignalingService::disconnectFromServer()
@@ -109,11 +131,14 @@ void SignalingService::leave(const QString &roomId, const QString &peerId)
 void SignalingService::onConnected()
 {
     m_reconnectAttempts = 0;
+    qInfo().noquote() << "[SignalingService] connected:" << m_serverUrl.toString();
     emit connected();
 }
 
 void SignalingService::onDisconnected()
 {
+    qWarning().noquote() << "[SignalingService] disconnected. manual=" << m_manualDisconnect
+                         << " url=" << m_serverUrl.toString();
     emit disconnected();
     if (!m_manualDisconnect)
         reconnect();
@@ -121,6 +146,9 @@ void SignalingService::onDisconnected()
 
 void SignalingService::onError(QAbstractSocket::SocketError error)
 {
+    qWarning().noquote() << "[SignalingService] socket error:" << static_cast<int>(error)
+                         << m_socket->errorString()
+                         << "url=" << m_serverUrl.toString();
     emit errorOccurred(m_socket->errorString());
 }
 

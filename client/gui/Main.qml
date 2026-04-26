@@ -17,15 +17,26 @@ Window {
     property bool addChatPopupOpen: false
     property string addChatMode: ""
     property string addChatErrorText: ""
+    property string addChatCreateRoomType: "group"
+    property string chatIdCopyHint: ""
+    property bool hasSelectedChat: clientBridge && clientBridge.selectedChatId.length > 0
 
     Connections {
         target: clientBridge
         function onSelectedChatIdChanged() {
             groupInfoOpen = false
+            chatIdCopyHint = ""
         }
         function onErrorOccurred(message) {
             console.warn(message)
         }
+    }
+
+    Timer {
+        id: chatIdCopyHintTimer
+        interval: 1300
+        repeat: false
+        onTriggered: chatIdCopyHint = ""
     }
 
     Rectangle {
@@ -350,8 +361,17 @@ Window {
                 }
             }
 
+            // Пустой экран, когда чат не выбран
+            Rectangle {
+                visible: !hasSelectedChat
+                width: parent.width - 300
+                height: parent.height
+                color: "#0e1621"
+            }
+
             // Окно чата
             Rectangle {
+                visible: hasSelectedChat
                 width: parent.width - 300
                 height: parent.height
                 color: "#0e1621"
@@ -706,6 +726,50 @@ Window {
                                         topPadding: 4
                                     }
 
+                                    Rectangle {
+                                        width: parent.width - 32
+                                        height: 30
+                                        radius: 8
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        color: chatIdCopyMa.containsMouse ? "#1a2c3f" : "#152232"
+                                        border.color: "#2a3c50"
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "ID: " + clientBridge.selectedChatId
+                                            color: "#9db2c8"
+                                            font.pixelSize: 11
+                                            elide: Text.ElideRight
+                                            width: parent.width - 18
+                                            horizontalAlignment: Text.AlignHCenter
+                                        }
+
+                                        MouseArea {
+                                            id: chatIdCopyMa
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (clientBridge.selectedChatId.length === 0)
+                                                    return
+                                                clientBridge.copyToClipboard(clientBridge.selectedChatId)
+                                                chatIdCopyHint = "ID скопирован"
+                                                chatIdCopyHintTimer.restart()
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        visible: chatIdCopyHint.length > 0
+                                        width: parent.width - 32
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        text: chatIdCopyHint
+                                        color: "#68d391"
+                                        font.pixelSize: 11
+                                        horizontalAlignment: Text.AlignHCenter
+                                        topPadding: 4
+                                    }
+
                                     Item {
                                         width: parent.width
                                         height: 20
@@ -916,6 +980,7 @@ Window {
                         addChatPopupOpen = false
                         addChatMode = ""
                         addChatErrorText = ""
+                                        addChatCreateRoomType = "group"
                         chatIdInput.text = ""
                         nicknameInput.text = ""
                         chatTitleInput.text = ""
@@ -1101,6 +1166,51 @@ Window {
                         }
 
                         Row {
+                            visible: addChatMode === "create"
+                            width: parent.width
+                            height: 36
+                            spacing: 8
+
+                            Rectangle {
+                                width: (parent.width - 8) / 2
+                                height: 36
+                                radius: 10
+                                color: addChatCreateRoomType === "direct" ? "#2a4a6e" : "#1a2633"
+                                border.color: addChatCreateRoomType === "direct" ? "#4d79a8" : "#243447"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Личный"
+                                    color: "#d7e6ff"
+                                    font.pixelSize: 12
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: addChatCreateRoomType = "direct"
+                                }
+                            }
+
+                            Rectangle {
+                                width: (parent.width - 8) / 2
+                                height: 36
+                                radius: 10
+                                color: addChatCreateRoomType === "group" ? "#2a4a6e" : "#1a2633"
+                                border.color: addChatCreateRoomType === "group" ? "#4d79a8" : "#243447"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Групповой"
+                                    color: "#d7e6ff"
+                                    font.pixelSize: 12
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: addChatCreateRoomType = "group"
+                                }
+                            }
+                        }
+
+                        Row {
                             visible: addChatMode.length > 0
                             width: parent.width
                             height: 36
@@ -1161,7 +1271,7 @@ Window {
                                                 addChatErrorText = "Для создания заполните Никнейм и Название чата"
                                                 return
                                             }
-                                            if (!clientBridge.createNewChat(nick, title)) {
+                                            if (!clientBridge.createNewChat(nick, title, addChatCreateRoomType)) {
                                                 addChatErrorText = "Не удалось создать чат"
                                                 return
                                             }
@@ -1171,6 +1281,7 @@ Window {
                                             chatIdInput.text = ""
                                             nicknameInput.text = ""
                                             chatTitleInput.text = ""
+                                            addChatCreateRoomType = "group"
                                             return
                                         }
 
@@ -1189,6 +1300,7 @@ Window {
                                         chatIdInput.text = ""
                                         nicknameInput.text = ""
                                         chatTitleInput.text = ""
+                                        addChatCreateRoomType = "group"
                                     }
                                 }
                             }

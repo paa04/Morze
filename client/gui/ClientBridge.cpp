@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDebug>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFileInfo>
@@ -9,6 +10,7 @@
 #include <QHash>
 #include <QHostAddress>
 #include <QHostInfo>
+#include <QGuiApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -16,6 +18,7 @@
 #include <QProcess>
 #include <QRandomGenerator>
 #include <QSettings>
+#include <QClipboard>
 #include <QTcpSocket>
 #include <QUdpSocket>
 #include <QUrl>
@@ -233,18 +236,24 @@ ClientBridge::ClientBridge(QObject *parent)
 
         connect(signalingService_.get(), &SignalingService::joined, this,
                 [this](const QString &roomId, const QString &roomType, const QString &peerId, const QJsonArray &) {
+                    qInfo().noquote() << "[GUI] signaling joined roomId=" << roomId
+                                      << " roomType=" << roomType << " peerId=" << peerId;
                     if (!roomId.isEmpty() && !peerId.isEmpty()) {
                         myPeerIdByRoom_[roomId] = peerId;
                     }
                     handleSignalingJoined(roomId, roomType);
                 });
         connect(signalingService_.get(), &SignalingService::connected, this, [this]() {
+            qInfo().noquote() << "[GUI] signaling connected";
             if (!pendingJoinRoomId_.isEmpty() && !pendingJoinNickname_.isEmpty() && !pendingJoinRoomType_.isEmpty()) {
+                qInfo().noquote() << "[GUI] replay pending join roomId=" << pendingJoinRoomId_
+                                  << " roomType=" << pendingJoinRoomType_;
                 signalingService_->join(pendingJoinRoomId_, pendingJoinNickname_, pendingJoinRoomType_);
             }
         });
         connect(signalingService_.get(), &SignalingService::errorReceived, this,
                 [this](const QString &message) {
+                    qWarning().noquote() << "[GUI] signaling protocol error:" << message;
                     pendingJoinRoomId_.clear();
                     pendingJoinNickname_.clear();
                     pendingJoinTitle_.clear();
@@ -254,6 +263,7 @@ ClientBridge::ClientBridge(QObject *parent)
                 });
         connect(signalingService_.get(), &SignalingService::errorOccurred, this,
                 [this](const QString &message) {
+                    qWarning().noquote() << "[GUI] signaling transport error:" << message;
                     pendingJoinRoomId_.clear();
                     pendingJoinNickname_.clear();
                     pendingJoinTitle_.clear();
@@ -513,7 +523,7 @@ void ClientBridge::updateNetworkSettings(const QString &bindAddress, const QStri
         boost::asio::detached);
 }
 
-bool ClientBridge::createNewChat(const QString &nickname, const QString &title) {
+bool ClientBridge::createNewChat(const QString &nickname, const QString &title, const QString &roomType) {
     if (!chatService_ || !memberService_ || !signalingService_) {
         emit errorOccurred("Сервисы чата недоступны");
         return false;
@@ -524,18 +534,24 @@ bool ClientBridge::createNewChat(const QString &nickname, const QString &title) 
     if (normalizedNick.isEmpty() || normalizedTitle.isEmpty()) {
         return false;
     }
+    const QString normalizedRoomType =
+        roomType.trimmed().compare("direct", Qt::CaseInsensitive) == 0 ? "direct" : "group";
 
     if (!ensureSignalingConnected()) {
+        qWarning().noquote() << "[GUI] create chat aborted: signaling not connected";
         return false;
     }
 
     pendingJoinMode_ = "create";
     pendingJoinNickname_ = normalizedNick;
     pendingJoinTitle_ = normalizedTitle;
-    pendingJoinRoomType_ = "group";
+    pendingJoinRoomType_ = normalizedRoomType;
     pendingJoinRoomId_ = QUuid::createUuid().toString(QUuid::WithoutBraces);
 
     if (signalingService_->isConnected()) {
+        qInfo().noquote() << "[GUI] create chat join roomId=" << pendingJoinRoomId_
+                          << " roomType=" << pendingJoinRoomType_
+                          << " nickname=" << pendingJoinNickname_;
         signalingService_->join(pendingJoinRoomId_, pendingJoinNickname_, pendingJoinRoomType_);
     }
 
@@ -630,6 +646,7 @@ bool ClientBridge::joinChatById(const QString &chatOrRoomId, const QString &nick
     }
 
     if (!ensureSignalingConnected()) {
+        qWarning().noquote() << "[GUI] join chat aborted: signaling not connected";
         return false;
     }
 
@@ -639,6 +656,9 @@ bool ClientBridge::joinChatById(const QString &chatOrRoomId, const QString &nick
     pendingJoinTitle_.clear();
     pendingJoinRoomType_ = "direct";
     if (signalingService_->isConnected()) {
+        qInfo().noquote() << "[GUI] join chat roomId=" << pendingJoinRoomId_
+                          << " roomType=" << pendingJoinRoomType_
+                          << " nickname=" << pendingJoinNickname_;
         signalingService_->join(pendingJoinRoomId_, pendingJoinNickname_, pendingJoinRoomType_);
     }
 
@@ -673,6 +693,12 @@ void ClientBridge::setChatNickname(const QString &chatId, const QString &nicknam
 
 QString ClientBridge::chatNickname(const QString &chatId) const {
     return chatNicknames_.value(chatId.trimmed());
+}
+
+void ClientBridge::copyToClipboard(const QString &text) const {
+    if (auto *clipboard = QGuiApplication::clipboard()) {
+        clipboard->setText(text);
+    }
 }
 
 void ClientBridge::refreshBindAddress() {
@@ -1099,15 +1125,19 @@ bool ClientBridge::ensureSignalingConnected() {
 
     const QString serverUrl = resolveSignalingServerUrl();
     if (serverUrl.isEmpty()) {
+        qWarning().noquote() << "[GUI] signaling connect failed: empty server url";
         emit errorOccurred("Укажите адрес сигнального сервера (нижняя строка в настройках, «Signaling / TURN») или signaling.server_url в config.json");
         return false;
     }
+    qInfo().noquote() << "[GUI] signaling connectToServer:" << serverUrl;
     signalingService_->connectToServer(QUrl(serverUrl));
     return true;
 }
 
 void ClientBridge::handleSignalingJoined(const QString &roomId, const QString &roomType) {
     if (pendingJoinRoomId_.isEmpty() || roomId != pendingJoinRoomId_) {
+        qWarning().noquote() << "[GUI] ignore joined event. pendingRoomId=" << pendingJoinRoomId_
+                             << " incomingRoomId=" << roomId;
         return;
     }
 

@@ -174,12 +174,14 @@ public:
     Q_INVOKABLE void selectChatByIndex(int index);
     Q_INVOKABLE void sendMessage(const QString &text);
     Q_INVOKABLE void updateNetworkSettings(const QString &bindAddress, const QString &stunServer, const QString &relayServer);
-    Q_INVOKABLE bool createNewChat(const QString &nickname, const QString &title);
+    /// roomType: "direct" (личный) или "group" (групповой)
+    Q_INVOKABLE bool createNewChat(const QString &nickname, const QString &title, const QString &roomType);
     Q_INVOKABLE bool joinChatById(const QString &chatOrRoomId, const QString &nickname);
     /// Удаляет чат с устройства (БД) и снимает выбор.
     Q_INVOKABLE void removeCurrentChat();
     Q_INVOKABLE void setChatNickname(const QString &chatId, const QString &nickname);
     Q_INVOKABLE QString chatNickname(const QString &chatId) const;
+    Q_INVOKABLE void copyToClipboard(const QString &text) const;
     Q_INVOKABLE void refreshBindAddress();
     Q_INVOKABLE void resolvePublicIpViaStun();
     Q_INVOKABLE void checkRelayConnection();

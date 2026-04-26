@@ -1,4 +1,5 @@
 #include <QGuiApplication>
+#include <QDebug>
 #include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -59,6 +60,9 @@ int main(int argc, char *argv[])
 
     QQmlApplicationEngine engine;
     ClientBridge clientBridge;
+    QObject::connect(&clientBridge, &ClientBridge::errorOccurred, &app, [](const QString &msg) {
+        qWarning().noquote() << "[GUI] ClientBridge error:" << msg;
+    });
     engine.rootContext()->setContextProperty("clientBridge", &clientBridge);
     QObject::connect(
         &engine,

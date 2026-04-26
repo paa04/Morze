@@ -6,8 +6,12 @@
 #include <sstream>
 #include <set>
 #include <map>
+#ifdef _WIN32
+#include <conio.h>
+#else
 #include <poll.h>
 #include <unistd.h>
+#endif
 #include <QCoreApplication>
 #include <QNetworkProxy>
 #include <boost/asio/co_spawn.hpp>
@@ -46,6 +50,16 @@ static std::string trim(const std::string& s) {
 std::string readLineNonBlocking() {
     std::cout.flush();
     std::string line;
+#ifdef _WIN32
+    while (true) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        if (_kbhit()) {
+            if (!std::getline(std::cin, line)) return "";
+            return trim(line);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+#else
     struct pollfd fds[1] = {{STDIN_FILENO, POLLIN, 0}};
     while (true) {
         QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
@@ -55,6 +69,7 @@ std::string readLineNonBlocking() {
             return trim(line);
         }
     }
+#endif
 }
 
 bool readIntNonBlocking(int& value) {
@@ -184,9 +199,14 @@ int main(int argc, char* argv[]) {
         auto signaling = container.signalingService();
 
         std::string serverUrl = container.config().signaling().server_url;
-        auto profiles = run_and_wait(ioc, container.profileService()->getAllProfiles(true));
-        if (!profiles.empty() && !profiles[0].getServerUrl().empty()) {
-            serverUrl = profiles[0].getServerUrl();
+        try {
+            auto profiles = run_and_wait(ioc, container.profileService()->getAllProfiles(true));
+            if (!profiles.empty() && !profiles[0].getServerUrl().empty()) {
+                serverUrl = profiles[0].getServerUrl();
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[main] Failed to read connection profile, fallback to config.json: "
+                      << e.what() << '\n';
         }
         std::cout << "Connecting to signaling server: " << serverUrl << "\n";
 
