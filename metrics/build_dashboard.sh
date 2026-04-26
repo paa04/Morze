@@ -1,11 +1,9 @@
 #!/bin/bash
-# Собирает метрики и генерирует self-contained HTML (без сервера)
+# Генерирует self-contained HTML из уже собранных данных (metrics/data/*.json)
+# Для полного цикла: сначала запустите collect.sh, потом этот скрипт.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# 1. Собрать данные
-bash "$SCRIPT_DIR/collect.sh"
-
-# 2. Встроить JSON прямо в HTML
+# Встроить JSON прямо в HTML
 python3 -c "
 import json, os
 
