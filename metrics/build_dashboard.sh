@@ -13,8 +13,12 @@ files = ['summary','commits_daily','commits_by_author','loc_by_author',
 
 embedded = {}
 for f in files:
-    with open(os.path.join(data_dir, f + '.json')) as fp:
-        embedded[f] = json.load(fp)
+    path = os.path.join(data_dir, f + '.json')
+    if os.path.exists(path):
+        with open(path) as fp:
+            embedded[f] = json.load(fp)
+    else:
+        embedded[f] = []
 
 with open('$SCRIPT_DIR/dashboard.html') as fp:
     html = fp.read()
