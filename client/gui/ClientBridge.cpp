@@ -240,18 +240,18 @@ ClientBridge::ClientBridge(QObject *parent)
                                       << " roomType=" << roomType << " peerId=" << peerId;
                     if (!roomId.isEmpty() && !peerId.isEmpty()) {
                         myPeerIdByRoom_[roomId] = peerId;
+                        if (webRTCService_)
+                            webRTCService_->setLocalPeerId(peerId);
                     }
                     roomTypeByRoom_[roomId] = roomType;
-                    // Track existing participants and ensure direct-room P2P starts
+                    // Track existing participants (WebRTC initiated by peerJoined, not here —
+                    // initiating here causes glare because the other side also initiates from peerJoined)
                     for (const QJsonValue &v : participants) {
                         QJsonObject obj = v.toObject();
                         QString pid = obj["peerId"].toString();
                         if (!pid.isEmpty() && pid != peerId) {
                             peerToRoom_[pid] = roomId;
                             peerUsernames_[roomId + ":" + pid] = obj["username"].toString();
-                            if (roomType.compare("direct", Qt::CaseInsensitive) == 0 && webRTCService_) {
-                                webRTCService_->initiateConnection(roomId, pid);
-                            }
                         }
                     }
                     handleSignalingJoined(roomId, roomType);

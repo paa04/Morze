@@ -134,6 +134,7 @@ void CommunicationController::onSignalingJoined(const QString& roomId, const QSt
 
     it->second.myPeerId = peerId.toStdString();
     it->second.roomType = roomType.toStdString();
+    m_webRTC->setLocalPeerId(peerId);
 
     for (const QJsonValue& v : participants) {
         QJsonObject obj = v.toObject();

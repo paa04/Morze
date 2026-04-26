@@ -14,6 +14,9 @@ public:
     explicit WebRTCService(const std::vector<std::string>& stunServers = {}, QObject *parent = nullptr);
     ~WebRTCService();
 
+    /// Set local peer ID for glare resolution (call after signaling "joined")
+    void setLocalPeerId(const QString &peerId);
+
     // Инициировать P2P-соединение с указанным peerId (создать offer)
     void initiateConnection(const QString &roomId, const QString &peerId);
 
@@ -57,11 +60,12 @@ signals:
         std::shared_ptr<rtc::DataChannel> dc;
         QString roomId;
         QString peerId;
-        bool makingOffer = false;
+        bool isInitiator = false;
         std::vector<std::pair<std::string, std::string>> pendingCandidates;
     };
 
     std::vector<std::string> m_stunServers;
+    QString m_localPeerId;
     void setupPeerConnection(const QString &roomId, const QString &peerId, bool isInitiator);
     void setupDataChannel(std::shared_ptr<rtc::DataChannel> dc, const QString &peerId);
     void closePeerConnection(const QString &peerId);

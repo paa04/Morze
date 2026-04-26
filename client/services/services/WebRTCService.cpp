@@ -11,8 +11,6 @@ WebRTCService::WebRTCService(const std::vector<std::string>& stunServers, QObjec
 
 WebRTCService::~WebRTCService()
 {
-    // Close all PeerConnections synchronously so libdatachannel callbacks stop
-    // before `this` is destroyed. Reset callbacks first to prevent stale invocations.
     for (auto it = m_connections.begin(); it != m_connections.end(); ++it) {
         if (it->pc) {
             it->pc->onLocalDescription(nullptr);
@@ -30,6 +28,11 @@ WebRTCService::~WebRTCService()
     m_connections.clear();
 }
 
+void WebRTCService::setLocalPeerId(const QString &peerId)
+{
+    m_localPeerId = peerId;
+}
+
 void WebRTCService::setStunServers(const std::vector<std::string>& servers) {
     m_stunServers = servers;
 }
@@ -37,7 +40,7 @@ void WebRTCService::setStunServers(const std::vector<std::string>& servers) {
 void WebRTCService::initiateConnection(const QString &roomId, const QString &peerId)
 {
     if (m_connections.contains(peerId)) {
-        qWarning() << "Connection already exists for" << peerId;
+        qWarning() << "[WebRTC] initiateConnection: already exists for" << peerId;
         return;
     }
     setupPeerConnection(roomId, peerId, true);
@@ -45,9 +48,22 @@ void WebRTCService::initiateConnection(const QString &roomId, const QString &pee
 
 void WebRTCService::acceptConnection(const QString &roomId, const QString &peerId, const QString &sdp)
 {
-    if (m_connections.contains(peerId)) {
-        qWarning() << "Connection already exists for" << peerId;
-        return;
+    auto it = m_connections.find(peerId);
+    if (it != m_connections.end()) {
+        // --- Glare: we already initiated a connection to this peer ---
+        // Perfect negotiation: the peer with the SMALLER peerId is "polite" (yields).
+        // The polite side destroys its outgoing offer and accepts the incoming one.
+        bool polite = (!m_localPeerId.isEmpty() && m_localPeerId < peerId);
+        if (it->isInitiator && polite) {
+            qWarning() << "[WebRTC] glare detected for" << peerId
+                        << "— polite side yields, accepting incoming offer";
+            closePeerConnection(peerId);
+            // Fall through to create a new connection as receiver
+        } else {
+            qWarning() << "[WebRTC] glare detected for" << peerId
+                        << "— impolite side keeps own offer, ignoring incoming";
+            return;
+        }
     }
     setupPeerConnection(roomId, peerId, false);
     auto &conn = m_connections[peerId];
@@ -61,14 +77,13 @@ void WebRTCService::addRemoteCandidate(const QString &peerId, const QString &can
 {
     auto it = m_connections.find(peerId);
     if (it == m_connections.end()) {
-        qWarning() << "No connection for" << peerId;
+        qWarning() << "[WebRTC] addRemoteCandidate: no connection for" << peerId;
         return;
     }
     try {
         it->pc->addRemoteCandidate(rtc::Candidate(candidate.toStdString(), mid.toStdString()));
     } catch (const std::exception &e) {
-        qWarning() << "addRemoteCandidate deferred for" << peerId << ":" << e.what();
-        // ICE candidate arrived before remote description — buffer it
+        qWarning() << "[WebRTC] addRemoteCandidate deferred for" << peerId << ":" << e.what();
         it->pendingCandidates.emplace_back(candidate.toStdString(), mid.toStdString());
     }
 }
@@ -104,7 +119,7 @@ void WebRTCService::onAnswerReceived(const QString &roomId, const QString &fromP
 {
     auto it = m_connections.find(fromPeerId);
     if (it == m_connections.end()) {
-        qWarning() << "No connection for answer from" << fromPeerId;
+        qWarning() << "[WebRTC] onAnswerReceived: no connection for" << fromPeerId;
         return;
     }
     it->pc->setRemoteDescription(rtc::Description(sdp["sdp"].toString().toStdString(), "answer"));
@@ -127,8 +142,6 @@ void WebRTCService::setupPeerConnection(const QString &roomId, const QString &pe
 
     auto pc = std::make_shared<rtc::PeerConnection>(config);
 
-    // QPointer guard: if WebRTCService is destroyed, `guard` becomes null
-    // and libdatachannel callbacks safely no-op instead of use-after-free.
     QPointer<WebRTCService> guard(this);
 
     pc->onLocalDescription([guard, roomId, peerId](rtc::Description desc) {
@@ -187,7 +200,7 @@ void WebRTCService::setupPeerConnection(const QString &roomId, const QString &pe
         });
     }
 
-    PeerConnection conn{pc, dc, roomId, peerId, isInitiator};
+    PeerConnection conn{pc, dc, roomId, peerId, isInitiator, {}};
     m_connections[peerId] = conn;
 }
 
@@ -236,7 +249,6 @@ void WebRTCService::closePeerConnection(const QString &peerId)
 {
     auto it = m_connections.find(peerId);
     if (it != m_connections.end()) {
-        // Unregister callbacks before closing to prevent stale invocations
         if (it->dc) {
             it->dc->onOpen(nullptr);
             it->dc->onMessage(nullptr);
@@ -250,6 +262,5 @@ void WebRTCService::closePeerConnection(const QString &peerId)
             it->pc->close();
         }
         m_connections.erase(it);
-        emit connectionClosed(peerId);
     }
 }
