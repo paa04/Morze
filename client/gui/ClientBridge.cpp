@@ -300,25 +300,37 @@ ClientBridge::ClientBridge(QObject *parent)
             webRTCService_ = std::make_shared<WebRTCService>(stunForWebRtc);
         }
 
-        // Signaling → WebRTC
-        connect(signalingService_.get(), &SignalingService::offerReceived,
-                webRTCService_.get(), &WebRTCService::onOfferReceived);
-        connect(signalingService_.get(), &SignalingService::answerReceived,
-                webRTCService_.get(), &WebRTCService::onAnswerReceived);
-        connect(signalingService_.get(), &SignalingService::iceCandidateReceived,
-                webRTCService_.get(), &WebRTCService::onIceCandidateReceived);
+        // Signaling → WebRTC (logging needed for diagnostics)
+        connect(signalingService_.get(), &SignalingService::offerReceived, this,
+                [this](const QString &roomId, const QString &fromPeerId, const QJsonObject &sdp) {
+                    qInfo().noquote() << "[GUI] ← offer from" << fromPeerId;
+                    webRTCService_->onOfferReceived(roomId, fromPeerId, sdp);
+                });
+        connect(signalingService_.get(), &SignalingService::answerReceived, this,
+                [this](const QString &roomId, const QString &fromPeerId, const QJsonObject &sdp) {
+                    qInfo().noquote() << "[GUI] ← answer from" << fromPeerId;
+                    webRTCService_->onAnswerReceived(roomId, fromPeerId, sdp);
+                });
+        connect(signalingService_.get(), &SignalingService::iceCandidateReceived, this,
+                [this](const QString &roomId, const QString &fromPeerId, const QJsonObject &candidate) {
+                    qInfo().noquote() << "[GUI] ← ICE from" << fromPeerId;
+                    webRTCService_->onIceCandidateReceived(roomId, fromPeerId, candidate);
+                });
 
-        // WebRTC → Signaling
+        // WebRTC → Signaling (logging needed for diagnostics)
         connect(webRTCService_.get(), &WebRTCService::sendOffer, this,
                 [this](const QString &roomId, const QString &peerId, const QJsonObject &sdp) {
+                    qInfo().noquote() << "[GUI] WebRTC → offer to" << peerId;
                     signalingService_->offer(roomId, peerId, sdp);
                 });
         connect(webRTCService_.get(), &WebRTCService::sendAnswer, this,
                 [this](const QString &roomId, const QString &peerId, const QJsonObject &sdp) {
+                    qInfo().noquote() << "[GUI] WebRTC → answer to" << peerId;
                     signalingService_->answer(roomId, peerId, sdp);
                 });
         connect(webRTCService_.get(), &WebRTCService::sendIceCandidate, this,
                 [this](const QString &roomId, const QString &peerId, const QJsonObject &candidate) {
+                    qInfo().noquote() << "[GUI] WebRTC → ICE to" << peerId;
                     signalingService_->iceCandidate(roomId, peerId, candidate);
                 });
 
@@ -340,10 +352,14 @@ ClientBridge::ClientBridge(QObject *parent)
         // Peer joined → track + initiate WebRTC for direct rooms
         connect(signalingService_.get(), &SignalingService::peerJoined, this,
                 [this](const QString &roomId, const QString &peerId, const QString &username) {
+                    qInfo().noquote() << "[GUI] peerJoined room=" << roomId << " peer=" << peerId
+                                      << " roomType=" << roomTypeByRoom_.value(roomId);
                     peerToRoom_[peerId] = roomId;
                     peerUsernames_[roomId + ":" + peerId] = username;
-                    if (roomTypeByRoom_.value(roomId) == "direct" && webRTCService_)
+                    if (roomTypeByRoom_.value(roomId) == "direct" && webRTCService_) {
+                        qInfo().noquote() << "[GUI] initiating WebRTC to" << peerId;
                         webRTCService_->initiateConnection(roomId, peerId);
+                    }
                 });
 
         // Peer left → cleanup WebRTC
