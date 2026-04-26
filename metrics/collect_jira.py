@@ -15,7 +15,15 @@ from urllib.parse import urlencode
 from base64 import b64encode
 
 # --- config ---
-BASE_URL = os.environ.get("JIRA_BASE_URL", "").rstrip("/")
+# Extract base URL (strip any /jira/software/... paths)
+_raw_url = os.environ.get("JIRA_BASE_URL", "").rstrip("/")
+# Keep only scheme + host (e.g. https://x.atlassian.net)
+if _raw_url:
+    from urllib.parse import urlparse
+    _parsed = urlparse(_raw_url)
+    BASE_URL = f"{_parsed.scheme}://{_parsed.netloc}"
+else:
+    BASE_URL = ""
 EMAIL    = os.environ.get("JIRA_USER_EMAIL", "")
 TOKEN    = os.environ.get("JIRA_API_TOKEN", "")
 PROJECT  = os.environ.get("JIRA_PROJECT_KEY", "KAN")
