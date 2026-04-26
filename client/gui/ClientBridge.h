@@ -213,6 +213,7 @@ private:
     /// IP bind + выбранный до первого refreshProfiles пустой релей: из config.json
     void loadDefaultNetworkState();
     QString readSignalingServerUrlFromConfigFile() const;
+    QString readCanaryServerUrlFromConfigFile() const;
     void loadChatNicknames();
     void persistChatNicknames() const;
     bool parseEndpoint(const QString &value, QString *host, quint16 *port, QString *error) const;

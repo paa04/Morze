@@ -27,6 +27,7 @@ add_library(signaling_core STATIC
   src/application/protocol.cpp
   src/application/message_handler.cpp
   src/infrastructure/ws_session.cpp
+  src/infrastructure/http_detect_session.cpp
   src/infrastructure/listener.cpp
   src/infrastructure/persistence/sqlite_room_store.cpp
 )

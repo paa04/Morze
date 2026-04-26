@@ -27,6 +27,17 @@ namespace signaling::infrastructure {
         ws_.async_accept(beast::bind_front_handler(&WsSession::onAccept, shared_from_this()));
     }
 
+    void WsSession::run(http::request<http::string_body> req,
+                         beast::flat_buffer buffer) {
+        buffer_ = std::move(buffer);
+        ws_.set_option(websocket::stream_base::timeout::suggested(beast::role_type::server));
+        ws_.set_option(websocket::stream_base::decorator([](websocket::response_type &res) {
+            res.set(http::field::server, "MorzeSignaling/1.0");
+        }));
+
+        ws_.async_accept(req, beast::bind_front_handler(&WsSession::onAccept, shared_from_this()));
+    }
+
     void WsSession::sendText(std::string payload) {
         auto self = shared_from_this();
         asio::post(ws_.get_executor(), [self, payload = std::move(payload)]() mutable {

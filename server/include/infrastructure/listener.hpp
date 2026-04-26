@@ -14,7 +14,8 @@ namespace signaling::infrastructure {
     public:
         Listener(boost::asio::io_context &ioc,
                  boost::asio::ip::tcp::endpoint endpoint,
-                 std::shared_ptr<application::MessageHandler> handler);
+                 std::shared_ptr<application::MessageHandler> handler,
+                 int canaryPercent = 50);
 
         void run();
 
@@ -26,6 +27,7 @@ namespace signaling::infrastructure {
         boost::asio::io_context &ioc_;
         boost::asio::ip::tcp::acceptor acceptor_;
         std::shared_ptr<application::MessageHandler> handler_;
+        int canaryPercent_;
     };
 
 } // namespace signaling::infrastructure

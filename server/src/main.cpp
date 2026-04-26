@@ -10,6 +10,7 @@ int main(int argc, char *argv[]) {
     uint16_t port = 9001;
     std::size_t threads = 1;
     std::string dbPath = "morze.db";
+    int canaryPercent = 50;
 
     try {
         if (argc > 1) {
@@ -29,12 +30,16 @@ int main(int argc, char *argv[]) {
         } else if (const char *envDb = std::getenv("DB_PATH")) {
             dbPath = envDb;
         }
+
+        if (const char *envCanary = std::getenv("CANARY_PERCENT")) {
+            canaryPercent = std::clamp(std::stoi(envCanary), 0, 100);
+        }
     } catch (const std::exception &ex) {
         std::cerr << "Invalid startup parameter: " << ex.what() << '\n';
         return 1;
     }
 
-    signaling::SignalingServer server(port, threads, dbPath);
+    signaling::SignalingServer server(port, threads, dbPath, canaryPercent);
     if (!server.start()) {
         return 1;
     }

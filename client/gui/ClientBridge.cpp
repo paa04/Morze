@@ -1,4 +1,5 @@
 #include "ClientBridge.h"
+#include "CanaryChecker.h"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -1231,6 +1232,24 @@ QString ClientBridge::readSignalingServerUrlFromConfigFile() const {
     return doc.object().value("signaling").toObject().value("server_url").toString().trimmed();
 }
 
+QString ClientBridge::readCanaryServerUrlFromConfigFile() const {
+    const QString configPath = resolveConfigJsonPath();
+    if (configPath.isEmpty()) {
+        return {};
+    }
+
+    QFile file(configPath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    const auto doc = QJsonDocument::fromJson(file.readAll());
+    if (!doc.isObject()) {
+        return {};
+    }
+
+    return doc.object().value("signaling").toObject().value("canary_server_url").toString().trimmed();
+}
+
 void ClientBridge::loadDefaultNetworkState() {
     {
         QSettings s("Morze", "MorzeGUI");
@@ -1260,12 +1279,20 @@ bool ClientBridge::ensureSignalingConnected() {
         return true;
     }
 
-    const QString serverUrl = resolveSignalingServerUrl();
+    QString serverUrl = resolveSignalingServerUrl();
     if (serverUrl.isEmpty()) {
         qWarning().noquote() << "[GUI] signaling connect failed: empty server url";
         emit errorOccurred("Укажите адрес сигнального сервера (нижняя строка в настройках, «Signaling / TURN») или signaling.server_url в config.json");
         return false;
     }
+
+    // Canary check: ask production server if this session should use canary
+    const QString canaryUrl = readCanaryServerUrlFromConfigFile();
+    if (!canaryUrl.isEmpty() && checkCanary(serverUrl)) {
+        qInfo().noquote() << "[GUI] canary flag received, switching to canary server";
+        serverUrl = canaryUrl;
+    }
+
     qInfo().noquote() << "[GUI] signaling connectToServer:" << serverUrl;
     signalingService_->connectToServer(QUrl(serverUrl));
     return true;

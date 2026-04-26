@@ -20,6 +20,9 @@ public:
             std::shared_ptr<application::MessageHandler> handler);
 
   void run();
+  /// Accept with a pre-read HTTP upgrade request (used by HttpDetectSession)
+  void run(boost::beast::http::request<boost::beast::http::string_body> req,
+           boost::beast::flat_buffer buffer);
   void sendText(std::string payload) override;
 
 private:

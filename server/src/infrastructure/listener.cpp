@@ -1,6 +1,6 @@
 #include "infrastructure/listener.hpp"
 
-#include "infrastructure/ws_session.hpp"
+#include "infrastructure/http_detect_session.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/beast/core.hpp>
@@ -16,8 +16,9 @@ namespace signaling::infrastructure {
 
     Listener::Listener(asio::io_context &ioc,
                        tcp::endpoint endpoint,
-                       std::shared_ptr<application::MessageHandler> handler)
-            : ioc_(ioc), acceptor_(ioc), handler_(std::move(handler)) {
+                       std::shared_ptr<application::MessageHandler> handler,
+                       int canaryPercent)
+            : ioc_(ioc), acceptor_(ioc), handler_(std::move(handler)), canaryPercent_(canaryPercent) {
         beast::error_code ec;
 
         acceptor_.open(endpoint.protocol(), ec);
@@ -57,7 +58,7 @@ namespace signaling::infrastructure {
         }
 
         if (!ec) {
-            std::make_shared<WsSession>(std::move(socket), handler_)->run();
+            std::make_shared<HttpDetectSession>(std::move(socket), handler_, canaryPercent_)->run();
         }
 
         doAccept();

@@ -24,9 +24,10 @@ namespace signaling
     {
         using WorkGuard = boost::asio::executor_work_guard<boost::asio::io_context::executor_type>;
 
-        explicit Impl(uint16_t p, std::size_t t, std::string db)
+        explicit Impl(uint16_t p, std::size_t t, std::string db, int canary)
                 : port(p), threads(std::max<std::size_t>(1, t)),
                   dbPath(std::move(db)),
+                  canaryPercent(canary),
                   ioc(static_cast<int>(threads)),
                   work_guard(boost::asio::make_work_guard(ioc))
         {
@@ -42,6 +43,7 @@ namespace signaling
         uint16_t port;
         std::size_t threads;
         std::string dbPath;
+        int canaryPercent;
 
         asio::io_context ioc;
         WorkGuard work_guard;
@@ -56,8 +58,8 @@ namespace signaling
 
     };
 
-    SignalingServer::SignalingServer(uint16_t port, std::size_t threads, std::string dbPath)
-            : impl_(std::make_unique<Impl>(port, threads, std::move(dbPath)))
+    SignalingServer::SignalingServer(uint16_t port, std::size_t threads, std::string dbPath, int canaryPercent)
+            : impl_(std::make_unique<Impl>(port, threads, std::move(dbPath), canaryPercent))
     {}
 
     SignalingServer::~SignalingServer()
@@ -77,7 +79,8 @@ namespace signaling
             impl_->listener = std::make_shared<infrastructure::Listener>(
                     impl_->ioc,
                     tcp::endpoint{tcp::v4(), impl_->port},
-                    impl_->handler);
+                    impl_->handler,
+                    impl_->canaryPercent);
             impl_->listener->run();
         } catch (const std::exception &ex)
         {

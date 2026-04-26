@@ -33,6 +33,7 @@
 #include "MessageDTOConverter.h"
 #include "MessageService.h"
 #include "ChatMemberService.h"
+#include "CanaryChecker.h"
 
 using namespace std::chrono_literals;
 
@@ -208,6 +209,16 @@ int main(int argc, char* argv[]) {
             std::cerr << "[main] Failed to read connection profile, fallback to config.json: "
                       << e.what() << '\n';
         }
+
+        // Canary check: ask production server if this session should use canary
+        {
+            const auto &canaryUrl = container.config().signaling().canary_server_url;
+            if (!canaryUrl.empty() && checkCanary(QString::fromStdString(serverUrl))) {
+                std::cout << "[canary] Redirecting to canary server\n";
+                serverUrl = canaryUrl;
+            }
+        }
+
         std::cout << "Connecting to signaling server: " << serverUrl << "\n";
 
         // State tracking

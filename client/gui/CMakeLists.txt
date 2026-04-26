@@ -60,6 +60,7 @@ qt_add_executable(appMorze_ui
     ../services/services/ConnectionProfileService.cpp
     ../services/services/SignalingService.cpp
     ../services/services/WebRTCService.cpp
+    ../services/services/CanaryChecker.cpp
 )
 
 qt_add_qml_module(appMorze_ui

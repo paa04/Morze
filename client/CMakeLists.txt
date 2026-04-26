@@ -175,6 +175,8 @@ add_executable(Morze main.cpp
         services/services/SignalingService.h
         services/services/WebRTCService.cpp
         services/services/WebRTCService.h
+        services/services/CanaryChecker.cpp
+        services/services/CanaryChecker.h
         services/services/ConnectionProfileService.cpp
         services/services/ConnectionProfileService.h
         controllers/DTO/ChatDTO.h
