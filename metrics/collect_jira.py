@@ -76,21 +76,23 @@ def jira_get(path, params=None):
         raise
 
 def fetch_all_issues():
-    """Fetch all issues from project with changelog."""
+    """Fetch all issues from project with changelog (new /search/jql endpoint)."""
     issues = []
-    start = 0
+    params = {
+        "jql": f"project={PROJECT} ORDER BY created ASC",
+        "maxResults": 100,
+        "expand": "changelog",
+        "fields": "created,resolutiondate,status,summary",
+    }
     while True:
-        data = jira_get("/rest/api/2/search", {
-            "jql": f"project={PROJECT} ORDER BY created ASC",
-            "startAt": start,
-            "maxResults": 100,
-            "expand": "changelog",
-            "fields": "created,resolutiondate,status,summary",
-        })
-        issues.extend(data["issues"])
-        if start + data["maxResults"] >= data["total"]:
+        data = jira_get("/rest/api/3/search/jql", params)
+        issues.extend(data.get("issues", []))
+        if data.get("isLast", True):
             break
-        start += data["maxResults"]
+        token = data.get("nextPageToken")
+        if not token:
+            break
+        params["nextPageToken"] = token
     return issues
 
 def parse_dt(s):
