@@ -127,15 +127,10 @@ async function init() {
   // Lead Time (JIRA)
   if (leadTime && leadTime.length > 0) {
     const ltStatuses = [
-      {key:'В работе',                   color:'#34d399'},
-      {key:'Ревью',                      color:'#fbbf24'},
-      {key:'Подготовка к тестированию',   color:'#60a5fa'},
-      {key:'На проверку',                color:'#fb923c'},
-      {key:'Тестируется',                color:'#f87171'},
-      {key:'Ожидает приемку',            color:'#e879f9'},
-      {key:'Приемка на платформе',       color:'#a78bfa'},
-      {key:'Готово',                     color:'#94a3b8'},
-      {key:'Требуется выгрузка',         color:'#4ade80'},
+      {key:'To Do',        color:'#94a3b8'},
+      {key:'In Progress',  color:'#60a5fa'},
+      {key:'In Review',    color:'#fbbf24'},
+      {key:'Done',         color:'#34d399'},
     ];
     const ltMonths = leadTime.map(e => e.month);
     new Chart(document.getElementById('leadTimeChart'), {

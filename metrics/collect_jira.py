@@ -49,17 +49,12 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-# Statuses in display order (matches the diagram)
+# Statuses in display order (matches actual KAN board)
 STATUS_ORDER = [
-    "В работе",
-    "Ревью",
-    "Подготовка к тестированию",
-    "На проверку",
-    "Тестируется",
-    "Ожидает приемку",
-    "Приемка на платформе",
-    "Готово",
-    "Требуется выгрузка",
+    "To Do",
+    "In Progress",
+    "In Review",
+    "Done",
 ]
 
 def jira_get(path, params=None):
