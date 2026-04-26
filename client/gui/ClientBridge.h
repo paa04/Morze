@@ -180,7 +180,7 @@ public:
     Q_INVOKABLE void updateNetworkSettings(const QString &bindAddress, const QString &stunServer, const QString &relayServer);
     /// roomType: "direct" (личный) или "group" (групповой)
     Q_INVOKABLE bool createNewChat(const QString &nickname, const QString &title, const QString &roomType);
-    Q_INVOKABLE bool joinChatById(const QString &chatOrRoomId, const QString &nickname);
+    Q_INVOKABLE bool joinChatById(const QString &chatOrRoomId, const QString &nickname, const QString &title);
     /// Удаляет чат с устройства (БД) и снимает выбор.
     Q_INVOKABLE void removeCurrentChat();
     Q_INVOKABLE void setChatNickname(const QString &chatId, const QString &nickname);

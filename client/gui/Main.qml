@@ -1134,7 +1134,7 @@ Window {
                         }
 
                         Rectangle {
-                            visible: addChatMode === "create"
+                            visible: addChatMode.length > 0
                             width: parent.width
                             height: 38
                             radius: 10
@@ -1286,11 +1286,12 @@ Window {
                                         }
 
                                         const targetId = chatIdInput.text.trim()
-                                        if (targetId.length === 0 || nick.length === 0) {
-                                            addChatErrorText = "Для входа заполните ID чата и Никнейм"
+                                            const title = chatTitleInput.text.trim()
+                                            if (targetId.length === 0 || nick.length === 0 || title.length === 0) {
+                                            addChatErrorText = "Для входа заполните ID чата, Никнейм и Название чата"
                                             return
                                         }
-                                        if (!clientBridge.joinChatById(targetId, nick)) {
+                                        if (!clientBridge.joinChatById(targetId, nick, title)) {
                                             addChatErrorText = "Не удалось присоединиться к чату"
                                             return
                                         }

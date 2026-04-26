@@ -766,7 +766,7 @@ void ClientBridge::removeCurrentChat() {
         boost::asio::detached);
 }
 
-bool ClientBridge::joinChatById(const QString &chatOrRoomId, const QString &nickname) {
+bool ClientBridge::joinChatById(const QString &chatOrRoomId, const QString &nickname, const QString &title) {
     if (!chatService_ || !memberService_ || !signalingService_) {
         emit errorOccurred("Сервисы чата недоступны");
         return false;
@@ -774,7 +774,8 @@ bool ClientBridge::joinChatById(const QString &chatOrRoomId, const QString &nick
 
     const QString normalizedId = chatOrRoomId.trimmed();
     const QString normalizedNick = nickname.trimmed();
-    if (normalizedId.isEmpty() || normalizedNick.isEmpty()) {
+    const QString normalizedTitle = title.trimmed();
+    if (normalizedId.isEmpty() || normalizedNick.isEmpty() || normalizedTitle.isEmpty()) {
         return false;
     }
 
@@ -786,7 +787,7 @@ bool ClientBridge::joinChatById(const QString &chatOrRoomId, const QString &nick
     pendingJoinMode_ = "join";
     pendingJoinRoomId_ = normalizedId;
     pendingJoinNickname_ = normalizedNick;
-    pendingJoinTitle_.clear();
+    pendingJoinTitle_ = normalizedTitle;
     pendingJoinRoomType_.clear(); // let server determine type from existing room
     if (signalingService_->isConnected()) {
         qInfo().noquote() << "[GUI] join chat roomId=" << pendingJoinRoomId_
