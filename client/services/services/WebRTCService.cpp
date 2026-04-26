@@ -1,21 +1,33 @@
 #include "WebRTCService.h"
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPointer>
 #include <QDebug>
 
 WebRTCService::WebRTCService(const std::vector<std::string>& stunServers, QObject *parent)
     : QObject(parent), m_stunServers(stunServers)
 {
-    if (m_stunServers.empty()) {
-        // Значение по умолчанию, если ничего не передано
-        m_stunServers = {"stun:stun.l.google.com:19302"};
-    }
 }
 
 WebRTCService::~WebRTCService()
 {
-    for (const auto &peerId : m_connections.keys())
-        closePeerConnection(peerId);
+    // Close all PeerConnections synchronously so libdatachannel callbacks stop
+    // before `this` is destroyed. Reset callbacks first to prevent stale invocations.
+    for (auto it = m_connections.begin(); it != m_connections.end(); ++it) {
+        if (it->pc) {
+            it->pc->onLocalDescription(nullptr);
+            it->pc->onLocalCandidate(nullptr);
+            it->pc->onStateChange(nullptr);
+            it->pc->onDataChannel(nullptr);
+            if (it->dc) {
+                it->dc->onOpen(nullptr);
+                it->dc->onMessage(nullptr);
+                it->dc->onClosed(nullptr);
+            }
+            it->pc->close();
+        }
+    }
+    m_connections.clear();
 }
 
 void WebRTCService::setStunServers(const std::vector<std::string>& servers) {
@@ -63,6 +75,12 @@ void WebRTCService::sendMessage(const QString &peerId, const QByteArray &data)
                                        reinterpret_cast<const std::byte*>(data.constData() + data.size())));
 }
 
+bool WebRTCService::isDataChannelOpen(const QString &peerId) const
+{
+    auto it = m_connections.find(peerId);
+    return it != m_connections.end() && it->dc && it->dc->isOpen();
+}
+
 void WebRTCService::closeConnection(const QString &peerId)
 {
     closePeerConnection(peerId);
@@ -70,9 +88,7 @@ void WebRTCService::closeConnection(const QString &peerId)
 
 void WebRTCService::onOfferReceived(const QString &roomId, const QString &fromPeerId, const QJsonObject &sdp)
 {
-    // Здесь можно автоматически принять или просто передать сигнал UI.
-    // Пока просто логируем, контроллер сам вызовет acceptConnection при необходимости.
-    qDebug() << "Received offer from" << fromPeerId << "in room" << roomId;
+    acceptConnection(roomId, fromPeerId, sdp["sdp"].toString());
 }
 
 void WebRTCService::onAnswerReceived(const QString &roomId, const QString &fromPeerId, const QJsonObject &sdp)
@@ -98,47 +114,66 @@ void WebRTCService::setupPeerConnection(const QString &roomId, const QString &pe
     }
 
     auto pc = std::make_shared<rtc::PeerConnection>(config);
-    std::shared_ptr<rtc::DataChannel> dc;
 
-    if (isInitiator) {
-        dc = pc->createDataChannel("chat");
-        setupDataChannel(dc, peerId);
-    } else {
-        pc->onDataChannel([this, peerId](std::shared_ptr<rtc::DataChannel> incoming) {
-            setupDataChannel(incoming, peerId);
-        });
-    }
+    // QPointer guard: if WebRTCService is destroyed, `guard` becomes null
+    // and libdatachannel callbacks safely no-op instead of use-after-free.
+    QPointer<WebRTCService> guard(this);
 
-    pc->onLocalDescription([this, roomId, peerId](rtc::Description desc) {
+    pc->onLocalDescription([guard, roomId, peerId](rtc::Description desc) {
+        if (!guard) return;
         QJsonObject sdp{
             {"type", desc.typeString().c_str()},
             {"sdp", QString::fromStdString(desc)}
         };
         if (desc.type() == rtc::Description::Type::Offer) {
-            emit sendOffer(roomId, peerId, sdp);
+            QMetaObject::invokeMethod(guard.data(), [guard, roomId, peerId, sdp]() {
+                if (guard) emit guard->sendOffer(roomId, peerId, sdp);
+            }, Qt::QueuedConnection);
         } else {
-            emit sendAnswer(roomId, peerId, sdp);
+            QMetaObject::invokeMethod(guard.data(), [guard, roomId, peerId, sdp]() {
+                if (guard) emit guard->sendAnswer(roomId, peerId, sdp);
+            }, Qt::QueuedConnection);
         }
     });
 
-    pc->onLocalCandidate([this, roomId, peerId](rtc::Candidate cand) {
+    pc->onLocalCandidate([guard, roomId, peerId](rtc::Candidate cand) {
+        if (!guard) return;
         QJsonObject candidate{
             {"candidate", cand.candidate().c_str()},
             {"sdpMid", cand.mid().c_str()}
         };
-        emit sendIceCandidate(roomId, peerId, candidate);
+        QMetaObject::invokeMethod(guard.data(), [guard, roomId, peerId, candidate]() {
+            if (guard) emit guard->sendIceCandidate(roomId, peerId, candidate);
+        }, Qt::QueuedConnection);
     });
 
-    pc->onStateChange([this, peerId](rtc::PeerConnection::State state) {
-    if (state == rtc::PeerConnection::State::Connected) {
-        emit connectionOpened(peerId);
-    } else if (state == rtc::PeerConnection::State::Disconnected ||
-               state == rtc::PeerConnection::State::Failed ||
-               state == rtc::PeerConnection::State::Closed) {
-        emit connectionClosed(peerId);
-        closePeerConnection(peerId);
+    pc->onStateChange([guard, peerId](rtc::PeerConnection::State state) {
+        if (!guard) return;
+        if (state == rtc::PeerConnection::State::Connected) {
+            QMetaObject::invokeMethod(guard.data(), [guard, peerId]() {
+                if (guard) emit guard->connectionOpened(peerId);
+            }, Qt::QueuedConnection);
+        } else if (state == rtc::PeerConnection::State::Disconnected ||
+                   state == rtc::PeerConnection::State::Failed ||
+                   state == rtc::PeerConnection::State::Closed) {
+            QMetaObject::invokeMethod(guard.data(), [guard, peerId]() {
+                if (guard) emit guard->connectionClosed(peerId);
+            }, Qt::QueuedConnection);
+        }
+    });
+
+    std::shared_ptr<rtc::DataChannel> dc;
+    if (isInitiator) {
+        dc = pc->createDataChannel("chat");
+        setupDataChannel(dc, peerId);
+    } else {
+        pc->onDataChannel([guard, peerId](std::shared_ptr<rtc::DataChannel> incoming) {
+            if (!guard) return;
+            QMetaObject::invokeMethod(guard.data(), [guard, peerId, incoming]() {
+                if (guard) guard->setupDataChannel(incoming, peerId);
+            }, Qt::QueuedConnection);
+        });
     }
-});
 
     PeerConnection conn{pc, dc, roomId, peerId, isInitiator};
     m_connections[peerId] = conn;
@@ -146,22 +181,37 @@ void WebRTCService::setupPeerConnection(const QString &roomId, const QString &pe
 
 void WebRTCService::setupDataChannel(std::shared_ptr<rtc::DataChannel> dc, const QString &peerId)
 {
-    dc->onOpen([this, peerId]() {
-        emit connectionOpened(peerId);
+    if (!dc) return;
+
+    QPointer<WebRTCService> guard(this);
+
+    dc->onOpen([guard, peerId]() {
+        if (!guard) return;
+        QMetaObject::invokeMethod(guard.data(), [guard, peerId]() {
+            if (guard) emit guard->connectionOpened(peerId);
+        }, Qt::QueuedConnection);
     });
 
-    dc->onMessage([this, peerId](rtc::message_variant data) {
+    dc->onMessage([guard, peerId](rtc::message_variant data) {
+        if (!guard) return;
+        QByteArray bytes;
         if (std::holds_alternative<std::string>(data)) {
             const auto &str = std::get<std::string>(data);
-            emit messageReceived(peerId, QByteArray(str.data(), str.size()));
+            bytes = QByteArray(str.data(), str.size());
         } else if (std::holds_alternative<rtc::binary>(data)) {
             const auto &bin = std::get<rtc::binary>(data);
-            emit messageReceived(peerId, QByteArray(reinterpret_cast<const char*>(bin.data()), bin.size()));
+            bytes = QByteArray(reinterpret_cast<const char*>(bin.data()), bin.size());
         }
+        QMetaObject::invokeMethod(guard.data(), [guard, peerId, bytes]() {
+            if (guard) emit guard->messageReceived(peerId, bytes);
+        }, Qt::QueuedConnection);
     });
 
-    dc->onClosed([this, peerId]() {
-        emit connectionClosed(peerId);
+    dc->onClosed([guard, peerId]() {
+        if (!guard) return;
+        QMetaObject::invokeMethod(guard.data(), [guard, peerId]() {
+            if (guard) emit guard->connectionClosed(peerId);
+        }, Qt::QueuedConnection);
     });
 
     auto it = m_connections.find(peerId);
@@ -174,8 +224,19 @@ void WebRTCService::closePeerConnection(const QString &peerId)
 {
     auto it = m_connections.find(peerId);
     if (it != m_connections.end()) {
-        if (it->pc)
+        // Unregister callbacks before closing to prevent stale invocations
+        if (it->dc) {
+            it->dc->onOpen(nullptr);
+            it->dc->onMessage(nullptr);
+            it->dc->onClosed(nullptr);
+        }
+        if (it->pc) {
+            it->pc->onLocalDescription(nullptr);
+            it->pc->onLocalCandidate(nullptr);
+            it->pc->onStateChange(nullptr);
+            it->pc->onDataChannel(nullptr);
             it->pc->close();
+        }
         m_connections.erase(it);
         emit connectionClosed(peerId);
     }

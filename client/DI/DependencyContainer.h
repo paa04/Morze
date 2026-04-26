@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/executor_work_guard.hpp>
 #include <thread>
 
 #include "ConfigManager.h"
@@ -28,7 +29,7 @@
 
 class DependencyContainer {
 public:
-    explicit DependencyContainer(const std::string& configPath);
+    explicit DependencyContainer(const std::string& configPath, const std::string& dbPathOverride = "");
     ~DependencyContainer();
 
     // Запуск асинхронного контекста (опционально, если нужно отдельно)
@@ -36,6 +37,7 @@ public:
     void stopIoContext();
 
     // Геттеры для компонентов
+    const ConfigManager& config() const { return *config_; }
     boost::asio::io_context& ioContext() { return ioc_; }
     std::shared_ptr<ChatService> chatService() const { return chatService_; }
     std::shared_ptr<ChatMemberService> memberService() const { return memberService_; }
@@ -59,6 +61,7 @@ private:
     std::string configPath_;
     std::unique_ptr<ConfigManager> config_;
     boost::asio::io_context ioc_;
+    boost::asio::executor_work_guard<boost::asio::io_context::executor_type> workGuard_{boost::asio::make_work_guard(ioc_)};
     std::shared_ptr<Database> database_;
 
     // Репозитории

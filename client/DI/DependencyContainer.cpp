@@ -1,14 +1,17 @@
 #include "DependencyContainer.h"
 
-#include <thread>
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/detached.hpp>
+#include <thread>
 
-DependencyContainer::DependencyContainer(const std::string& configPath)
+DependencyContainer::DependencyContainer(const std::string& configPath, const std::string& dbPathOverride)
     : configPath_(configPath)
-    , ioc_(std::thread::hardware_concurrency()) // пул потоков
+    , ioc_(std::thread::hardware_concurrency())
 {
     config_ = std::make_unique<ConfigManager>(ConfigManager::loadFromFile(configPath));
+    if (!dbPathOverride.empty()) {
+        config_->setDatabasePath(dbPathOverride);
+    }
     initDatabase();
     initRepositories();
     initServices();
@@ -38,21 +41,8 @@ void DependencyContainer::applyStunServersFromProfile()
                 stunServers = config_->signaling().stun_urls;
             }
 
-            // Если конфиг тоже пуст — дефолтный
-            if (stunServers.empty()) {
-                stunServers.emplace_back("stun:stun.l.google.com:19302");
-            }
-
             webRTC_->setStunServers(stunServers);
             std::cout << "STUN servers configured (" << stunServers.size() << ")\n";
-
-            const auto endpoint = stunProbe_->detectPublicEndpoint(stunServers);
-            if (endpoint.has_value()) {
-                std::cout << "Public endpoint detected via STUN: "
-                          << endpoint->ip << ":" << endpoint->port << '\n';
-            } else {
-                std::cout << "Public endpoint was not detected via STUN\n";
-            }
         } catch (const std::exception& e) {
             std::cerr << "Failed to load STUN servers: " << e.what() << '\n';
             webRTC_->setStunServers({"stun:stun.l.google.com:19302"});
@@ -74,6 +64,7 @@ void DependencyContainer::runIoContext()
 
 void DependencyContainer::stopIoContext()
 {
+    workGuard_.reset();
     ioc_.stop();
 }
 
@@ -107,8 +98,8 @@ void DependencyContainer::initServices()
 void DependencyContainer::initNetworkServices()
 {
     signaling_ = std::make_shared<SignalingService>();
-    webRTC_ = std::make_shared<WebRTCService>();
-    stunProbe_ = std::make_shared<StunProbeService>();
+    // Set STUN from config synchronously so it's ready before any connection
+    webRTC_ = std::make_shared<WebRTCService>(config_->signaling().stun_urls);
 }
 
 void DependencyContainer::initControllers()

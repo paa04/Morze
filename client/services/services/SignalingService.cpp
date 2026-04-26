@@ -1,6 +1,7 @@
 #include "SignalingService.h"
 #include <QTimer>
 #include <QJsonDocument>
+#include <iostream>
 
 SignalingService::SignalingService(QObject *parent)
     : QObject(parent)
@@ -38,13 +39,19 @@ void SignalingService::disconnectFromServer()
 
 void SignalingService::reconnect()
 {
-    if (!m_serverUrl.isEmpty() && !m_manualDisconnect) {
-        QTimer::singleShot(1000, this, [this]() {
-            if (m_socket->state() == QAbstractSocket::UnconnectedState) {
-                m_socket->open(m_serverUrl);
-            }
-        });
+    if (m_serverUrl.isEmpty() || m_manualDisconnect)
+        return;
+    if (m_reconnectAttempts >= kMaxReconnectAttempts) {
+        emit errorOccurred("Max reconnect attempts reached (" + QString::number(kMaxReconnectAttempts) + ")");
+        return;
     }
+    int delayMs = std::min(kBaseReconnectMs * (1 << m_reconnectAttempts), kMaxReconnectMs);
+    ++m_reconnectAttempts;
+    QTimer::singleShot(delayMs, this, [this]() {
+        if (m_socket->state() == QAbstractSocket::UnconnectedState) {
+            m_socket->open(m_serverUrl);
+        }
+    });
 }
 
 bool SignalingService::isConnected() const
@@ -101,6 +108,7 @@ void SignalingService::leave(const QString &roomId, const QString &peerId)
 
 void SignalingService::onConnected()
 {
+    m_reconnectAttempts = 0;
     emit connected();
 }
 
@@ -134,6 +142,10 @@ void SignalingService::onTextMessageReceived(const QString &message)
 void SignalingService::handleMessage(const QJsonObject &msg)
 {
     QString type = msg["type"].toString();
+    if (type == "buffered-messages" || type == "error") {
+        std::cout << "[WS-IN] " << QJsonDocument(msg).toJson(QJsonDocument::Compact).toStdString() << "\n";
+        std::cout.flush();
+    }
     if (type == "joined") {
         emit joined(msg["roomId"].toString(),
                     msg["roomType"].toString(),

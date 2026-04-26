@@ -1,4 +1,5 @@
 #include "CommunicationController.h"
+#include "TimePointConverter.h"
 
 CommunicationController::CommunicationController(SignalingService *signaling,
                                                  WebRTCService *webRTC,
@@ -40,6 +41,7 @@ void CommunicationController::joinChat(const ChatDTO& chat, const std::string& u
     RoomState state;
     state.roomId = chat.getRoomId();
     state.roomType = chat.getType();
+    state.username = username;
     m_rooms[chat.getRoomId()] = state;
 }
 
@@ -94,15 +96,41 @@ std::vector<ChatMemberDTO> CommunicationController::getParticipants(const std::s
 }
 
 // --- Входящие от SignalingService ---
-void CommunicationController::onSignalingConnected() {}
-void CommunicationController::onSignalingDisconnected() {}
+void CommunicationController::onSignalingConnected()
+{
+    // Re-join all rooms we were in before disconnect (API.md: "Чек-лист для запуска клиента")
+    for (auto& [roomId, state] : m_rooms) {
+        if (state.username.empty()) continue;
+        m_signaling->join(QString::fromStdString(roomId),
+                          QString::fromStdString(state.username),
+                          QString::fromStdString(state.roomType));
+    }
+}
+
+void CommunicationController::onSignalingDisconnected()
+{
+    // Close all WebRTC connections — they're dead without signaling
+    for (auto& [roomId, state] : m_rooms) {
+        for (const auto& [peerId, _] : state.participants) {
+            m_webRTC->closeConnection(QString::fromStdString(peerId));
+        }
+        state.participants.clear();
+        state.myPeerId.clear();
+    }
+    m_peerToRoom.clear();
+    m_pendingMessages.clear();
+}
 
 void CommunicationController::onSignalingJoined(const QString& roomId, const QString& roomType,
                                                 const QString& peerId, const QJsonArray& participants)
 {
     std::string roomIdStr = roomId.toStdString();
     auto it = m_rooms.find(roomIdStr);
-    if (it == m_rooms.end()) return;
+    if (it == m_rooms.end()) {
+        std::cout << "[WARN] onSignalingJoined: room " << roomIdStr << " not in m_rooms, ignoring\n";
+        std::cout.flush();
+        return;
+    }
 
     it->second.myPeerId = peerId.toStdString();
     it->second.roomType = roomType.toStdString();
@@ -137,7 +165,9 @@ void CommunicationController::onSignalingPeerJoined(const QString& roomId, const
 
     emit participantJoined(roomIdStr, member);
 
-    if (it->second.roomType == "direct" && peerIdStr != it->second.myPeerId) {
+    if (it->second.roomType == "direct"
+        && !it->second.myPeerId.empty()
+        && peerIdStr != it->second.myPeerId) {
         setupWebRtcForPeer(roomIdStr, peerIdStr);
     }
 }
@@ -178,7 +208,7 @@ void CommunicationController::onSignalingGroupMessageReceived(const QString& roo
     msg.setChatId(roomId.toStdString());
     msg.setSenderId(fromPeerId.toStdString());
     msg.setContent(payload["text"].toString().toStdString());
-    msg.setCreatedAt(std::to_string(std::chrono::system_clock::now().time_since_epoch().count()));
+    msg.setCreatedAt(TimePointConverter::toIsoString(std::chrono::system_clock::now()));
     msg.setDirection("incoming");
     msg.setDeliveryState("delivered");
 
@@ -188,6 +218,8 @@ void CommunicationController::onSignalingGroupMessageReceived(const QString& roo
 
 void CommunicationController::onSignalingBufferedMessagesReceived(const QString& roomId, const QJsonArray& messages)
 {
+    std::cout << "[BUFFERED] Received " << messages.size() << " buffered message(s) for room " << roomId.toStdString() << "\n";
+    std::cout.flush();
     for (const QJsonValue& v : messages) {
         QJsonObject obj = v.toObject();
         onSignalingGroupMessageReceived(roomId,
@@ -203,7 +235,9 @@ void CommunicationController::onSignalingErrorReceived(const QString& error)
 }
 
 // --- WebRTC ---
-void CommunicationController::onWebRtcConnectionOpened(const QString& peerId) {}
+void CommunicationController::onWebRtcConnectionOpened(const QString& peerId) {
+    flushPendingMessages(peerId.toStdString());
+}
 void CommunicationController::onWebRtcConnectionClosed(const QString& peerId) {}
 
 void CommunicationController::onWebRtcMessageReceived(const QString& peerId, const QByteArray& data)
@@ -217,7 +251,7 @@ void CommunicationController::onWebRtcMessageReceived(const QString& peerId, con
     msg.setContent(data.toStdString());
     msg.setDirection("incoming");
     msg.setDeliveryState("delivered");
-    msg.setCreatedAt(std::to_string(std::chrono::system_clock::now().time_since_epoch().count()));
+    msg.setCreatedAt(TimePointConverter::toIsoString(std::chrono::system_clock::now()));
 
     emit messageReceived(msg);
 }
@@ -261,8 +295,31 @@ void CommunicationController::handleDirectMessage(const MessageDTO& msg)
     }
 
     ensureWebRtcConnection(msg.getChatId(), targetPeerId);
-    m_webRTC->sendMessage(QString::fromStdString(targetPeerId), QByteArray::fromStdString(msg.getContent()));
+
+    QByteArray data = QByteArray::fromStdString(msg.getContent());
+    // Queue message — will be sent when DataChannel opens (or immediately if already open)
+    auto &queue = m_pendingMessages[targetPeerId];
+    if (queue.size() >= 1000) {
+        emit errorOccurred("Message queue full for peer " + targetPeerId + ", dropping oldest");
+        queue.erase(queue.begin());
+    }
+    queue.push_back(data);
+    flushPendingMessages(targetPeerId);
     emit messageDelivered(msg.getId());
+}
+
+void CommunicationController::flushPendingMessages(const std::string& peerId)
+{
+    auto it = m_pendingMessages.find(peerId);
+    if (it == m_pendingMessages.end() || it->second.empty()) return;
+
+    if (!m_webRTC->isDataChannelOpen(QString::fromStdString(peerId)))
+        return; // DC not ready yet — keep messages queued
+
+    for (auto& data : it->second) {
+        m_webRTC->sendMessage(QString::fromStdString(peerId), data);
+    }
+    it->second.clear();
 }
 
 void CommunicationController::handleGroupMessage(const MessageDTO& msg)
@@ -279,5 +336,6 @@ void CommunicationController::setupWebRtcForPeer(const std::string& roomId, cons
 
 void CommunicationController::ensureWebRtcConnection(const std::string& roomId, const std::string& peerId)
 {
+    // initiateConnection returns early if connection already exists
     m_webRTC->initiateConnection(QString::fromStdString(roomId), QString::fromStdString(peerId));
 }

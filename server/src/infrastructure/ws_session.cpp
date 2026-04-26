@@ -75,8 +75,10 @@ namespace signaling::infrastructure {
     }
 
     void WsSession::onWrite(beast::error_code ec, std::size_t) {
-        if (ec) {
-            cleanup();
+        if (ec || closed_) {
+            if (!closed_) {
+                cleanup();
+            }
             return;
         }
 

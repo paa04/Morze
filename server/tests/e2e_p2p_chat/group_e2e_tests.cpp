@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <boost/json/object.hpp>
+#include <thread>
 
 namespace {
 

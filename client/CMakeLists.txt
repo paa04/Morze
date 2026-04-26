@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20)
 project(Morze)
 include(FetchContent)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -6,65 +6,42 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 #set(CMAKE_AUTOUIC ON)
 set(CMAKE_CXX_STANDARD 23)
-# Shorten FetchContent paths on Windows to avoid MAX_PATH issues in git submodules.
-if(WIN32)
-    set(FETCHCONTENT_BASE_DIR "C:/_morze_fc")
-endif()
 
-# set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/qt6" CACHE PATH "Qt6 prefix path")
+set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/qt6" CACHE PATH "Qt6 prefix path")
 
 FetchContent_Declare(
         sqlite3
         URL https://www.sqlite.org/2026/sqlite-amalgamation-3530000.zip
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(sqlite3)
-set(SQLITE3_C_FILE "${sqlite3_SOURCE_DIR}/sqlite3.c")
-if(NOT EXISTS "${SQLITE3_C_FILE}")
-    file(GLOB SQLITE3_C_CANDIDATES "${sqlite3_SOURCE_DIR}/*/sqlite3.c")
-    list(LENGTH SQLITE3_C_CANDIDATES SQLITE3_C_COUNT)
-    if(SQLITE3_C_COUNT GREATER 0)
-        list(GET SQLITE3_C_CANDIDATES 0 SQLITE3_C_FILE)
-    endif()
-endif()
-if(NOT EXISTS "${SQLITE3_C_FILE}")
-    message(FATAL_ERROR "sqlite3.c not found in fetched sqlite3 sources: ${sqlite3_SOURCE_DIR}")
-endif()
-add_library(sqlite3 STATIC "${SQLITE3_C_FILE}")
-get_filename_component(SQLITE3_INCLUDE_DIR "${SQLITE3_C_FILE}" DIRECTORY)
-target_include_directories(sqlite3 PUBLIC "${SQLITE3_INCLUDE_DIR}")
 
 FetchContent_Declare(
         sqlite_orm
         GIT_REPOSITORY https://github.com/fnc12/sqlite_orm.git
         GIT_TAG        v1.9.1 # Или любой другой тег/коммит, который вы предпочитаете
 )
-FetchContent_GetProperties(sqlite_orm)
-if(NOT sqlite_orm_POPULATED)
-    FetchContent_Populate(sqlite_orm)
-endif()
-add_library(sqlite_orm INTERFACE)
-target_include_directories(sqlite_orm INTERFACE ${sqlite_orm_SOURCE_DIR}/include)
-add_library(sqlite_orm::sqlite_orm ALIAS sqlite_orm)
+FetchContent_MakeAvailable(sqlite_orm)
 
-set(NO_QT ON CACHE BOOL "Disable Qt support in libdatachannel" FORCE)
-set(NO_MEDIA ON CACHE BOOL "Disable media transport in libdatachannel" FORCE)
-if(WIN32 AND NOT DEFINED OPENSSL_ROOT_DIR)
-    # Default location for MinGW OpenSSL from MSYS2
-    set(OPENSSL_ROOT_DIR "C:/msys64/mingw64" CACHE PATH "OpenSSL root directory for libdatachannel")
+find_package(LibDataChannel QUIET)
+if(NOT LibDataChannel_FOUND)
+    message(STATUS "System libdatachannel not found, fetching from source...")
+    set(NO_QT ON CACHE BOOL "Disable Qt support in libdatachannel" FORCE)
+    set(CMAKE_AUTOMOC OFF)
+    FetchContent_Declare(
+            libdatachannel
+            GIT_REPOSITORY https://github.com/paullouisageneau/libdatachannel.git
+            GIT_TAG v0.24.2
+    )
+    FetchContent_MakeAvailable(libdatachannel)
+    set(CMAKE_AUTOMOC ON)
+    # FetchContent target is "datachannel", alias it to match system package
+    if(NOT TARGET LibDataChannel::LibDataChannel)
+        add_library(LibDataChannel::LibDataChannel ALIAS datachannel)
+    endif()
+else()
+    message(STATUS "Using system libdatachannel")
 endif()
-if(WIN32)
-    set(OPENSSL_USE_STATIC_LIBS FALSE CACHE BOOL "Use dynamic OpenSSL libs" FORCE)
-endif()
-set(CMAKE_AUTOMOC OFF)
-FetchContent_Declare(
-        libdatachannel
-        GIT_REPOSITORY https://github.com/paullouisageneau/libdatachannel.git
-        GIT_TAG v0.24.2
-        GIT_CONFIG core.longpaths=true
-)
-FetchContent_MakeAvailable(libdatachannel)
-set(CMAKE_AUTOMOC ON)
+
 FetchContent_Declare(
         cpm
         GIT_REPOSITORY https://github.com/cpm-cmake/CPM.cmake
@@ -76,7 +53,9 @@ set(BOOST_JSON_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(BOOST_JSON_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 function(add_boost_library NAME REPO TAG)
-    cmake_policy(SET CMP0169 OLD)
+    if(POLICY CMP0169)
+        cmake_policy(SET CMP0169 OLD)
+    endif()
     FetchContent_Declare(
             boost_${NAME}
             GIT_REPOSITORY ${REPO}
@@ -108,12 +87,23 @@ add_boost_library(uuid              https://github.com/boostorg/uuid            
 add_boost_library(asio              https://github.com/boostorg/asio            boost-1.90.0)
 add_boost_library(beast             https://github.com/boostorg/beast           boost-1.90.0)
 
-#FetchContent_Declare(
-#        json
-#        GIT_REPOSITORY https://github.com/nlohmann/json.git
-#        GIT_TAG v3.11.3
-#)
-#FetchContent_MakeAvailable(json)
+find_package(nlohmann_json 3.11 QUIET)
+if(NOT nlohmann_json_FOUND)
+    # libdatachannel (when fetched) bundles its own nlohmann_json target
+    if(TARGET nlohmann_json)
+        message(STATUS "Using nlohmann_json bundled with libdatachannel")
+    else()
+        message(STATUS "System nlohmann_json not found, fetching from source...")
+        FetchContent_Declare(
+                json
+                GIT_REPOSITORY https://github.com/nlohmann/json.git
+                GIT_TAG v3.11.3
+        )
+        FetchContent_MakeAvailable(json)
+    endif()
+else()
+    message(STATUS "Using system nlohmann_json")
+endif()
 
 target_link_libraries(Boost_uuid INTERFACE
         Boost_config Boost_core Boost_assert Boost_throw_exception
@@ -133,7 +123,7 @@ target_compile_definitions(Boost_asio INTERFACE BOOST_ASIO_HAS_CO_AWAIT)
 
 
 
-find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets Gui Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets)
 
 add_executable(Morze main.cpp
         repositories/dbContext/Database.cpp
@@ -192,8 +182,6 @@ add_executable(Morze main.cpp
         services/services/SignalingService.h
         services/services/WebRTCService.cpp
         services/services/WebRTCService.h
-        services/services/StunProbeService.cpp
-        services/services/StunProbeService.h
         services/services/ConnectionProfileService.cpp
         services/services/ConnectionProfileService.h
         controllers/DTO/ChatDTO.h
@@ -239,21 +227,20 @@ target_link_libraries(Morze PRIVATE
         Boost::asio
         nlohmann_json::nlohmann_json
         Boost::beast
-        datachannel
+        LibDataChannel::LibDataChannel
         Qt6::Core
         Qt6::Network
         Qt6::WebSockets
-        Qt6::Gui
-        Qt6::Widgets
 )
+
+# Copy config.json next to the binary so it's always found
+add_custom_command(TARGET Morze POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/config.json
+        $<TARGET_FILE_DIR:Morze>/config.json)
 
 if(WIN32)
     target_link_libraries(Morze PRIVATE ws2_32)
-endif()
-
-option(BUILD_GUI_SUBPROJECT "Build Qt Quick GUI subproject" ON)
-if(BUILD_GUI_SUBPROJECT)
-    add_subdirectory(gui)
 endif()
 
 # ------------------- Тесты -------------------
@@ -298,8 +285,6 @@ if(BUILD_TESTS)
             services/services/SignalingService.h
             services/services/WebRTCService.cpp
             services/services/WebRTCService.h
-            services/services/StunProbeService.cpp
-            services/services/StunProbeService.h
             controllers/DTO/ChatDTO.h
             controllers/DTO/ChatMemberDTO.h
             controllers/DTO/ChatMemberDTO.h
@@ -353,12 +338,10 @@ if(BUILD_TESTS)
             Boost::beast
             nlohmann_json::nlohmann_json
             doctest::doctest
-            datachannel
+            LibDataChannel::LibDataChannel
             Qt6::Core
             Qt6::Network
             Qt6::WebSockets
-            Qt6::Gui
-            Qt6::Widgets
     )
 
     # Включаем CTest для интеграции с IDE

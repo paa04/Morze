@@ -103,7 +103,7 @@ public:
                     const std::optional<std::string>& peerIdCheck,
                     std::string& error);
 
-  DisconnectResult disconnect(const std::shared_ptr<IConnection>& session);
+  std::vector<DisconnectResult> disconnect(const std::shared_ptr<IConnection>& session);
 
 private:
   struct ClientInfo {
@@ -120,10 +120,13 @@ private:
   std::vector<std::shared_ptr<IConnection>> collectOnlinePeers(
       const std::string& roomId, const std::string& excludePeerId);
 
+  // Find ClientInfo for a session in a specific room (nullptr if not found)
+  ClientInfo* findClient(IConnection* session, const std::string& roomId);
+
   std::shared_ptr<IRoomStore> store_;
   std::mutex mu_;
-  // IConnection* → client info (which room, which peerId)
-  std::unordered_map<IConnection*, ClientInfo> clients_;
+  // IConnection* → client info per room (one entry per room joined)
+  std::unordered_multimap<IConnection*, ClientInfo> clients_;
   // peerId → live session (for routing messages to peers)
   std::unordered_map<std::string, std::weak_ptr<IConnection>> connections_;
   std::uint64_t nextPeerSeq_{1};
