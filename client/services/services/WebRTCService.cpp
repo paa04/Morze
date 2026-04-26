@@ -52,6 +52,9 @@ void WebRTCService::acceptConnection(const QString &roomId, const QString &peerI
     setupPeerConnection(roomId, peerId, false);
     auto &conn = m_connections[peerId];
     conn.pc->setRemoteDescription(rtc::Description(sdp.toStdString(), "offer"));
+    for (const auto &[cand, mid] : conn.pendingCandidates)
+        conn.pc->addRemoteCandidate(rtc::Candidate(cand, mid));
+    conn.pendingCandidates.clear();
 }
 
 void WebRTCService::addRemoteCandidate(const QString &peerId, const QString &candidate, const QString &mid)
@@ -61,7 +64,13 @@ void WebRTCService::addRemoteCandidate(const QString &peerId, const QString &can
         qWarning() << "No connection for" << peerId;
         return;
     }
-    it->pc->addRemoteCandidate(rtc::Candidate(candidate.toStdString(), mid.toStdString()));
+    try {
+        it->pc->addRemoteCandidate(rtc::Candidate(candidate.toStdString(), mid.toStdString()));
+    } catch (const std::exception &e) {
+        qWarning() << "addRemoteCandidate deferred for" << peerId << ":" << e.what();
+        // ICE candidate arrived before remote description — buffer it
+        it->pendingCandidates.emplace_back(candidate.toStdString(), mid.toStdString());
+    }
 }
 
 void WebRTCService::sendMessage(const QString &peerId, const QByteArray &data)
@@ -99,6 +108,9 @@ void WebRTCService::onAnswerReceived(const QString &roomId, const QString &fromP
         return;
     }
     it->pc->setRemoteDescription(rtc::Description(sdp["sdp"].toString().toStdString(), "answer"));
+    for (const auto &[cand, mid] : it->pendingCandidates)
+        it->pc->addRemoteCandidate(rtc::Candidate(cand, mid));
+    it->pendingCandidates.clear();
 }
 
 void WebRTCService::onIceCandidateReceived(const QString &roomId, const QString &fromPeerId, const QJsonObject &candidate)

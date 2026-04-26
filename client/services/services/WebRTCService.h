@@ -58,6 +58,7 @@ signals:
         QString roomId;
         QString peerId;
         bool makingOffer = false;
+        std::vector<std::pair<std::string, std::string>> pendingCandidates;
     };
 
     std::vector<std::string> m_stunServers;
