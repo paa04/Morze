@@ -480,6 +480,10 @@ bool ClientBridge::relayCheckOk() const {
     return relayCheckOk_;
 }
 
+bool ClientBridge::isCanary() const {
+    return isCanary_;
+}
+
 void ClientBridge::refreshAll() {
     refreshProfiles();
     refreshChats();
@@ -1290,8 +1294,11 @@ bool ClientBridge::ensureSignalingConnected() {
     const QString canaryUrl = readCanaryServerUrlFromConfigFile();
     if (!canaryUrl.isEmpty() && checkCanary(serverUrl)) {
         qInfo().noquote() << "[GUI] canary flag received, switching to canary server";
-        serverUrl = canaryUrl;
+        isCanary_ = true;
+    } else {
+        isCanary_ = false;
     }
+    emit connectionChecksChanged();
 
     qInfo().noquote() << "[GUI] signaling connectToServer:" << serverUrl;
     signalingService_->connectToServer(QUrl(serverUrl));

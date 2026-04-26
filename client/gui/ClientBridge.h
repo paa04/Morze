@@ -145,6 +145,7 @@ class ClientBridge final : public QObject {
     Q_PROPERTY(bool stunCheckOk READ stunCheckOk NOTIFY connectionChecksChanged)
     Q_PROPERTY(QString relayCheckText READ relayCheckText NOTIFY connectionChecksChanged)
     Q_PROPERTY(bool relayCheckOk READ relayCheckOk NOTIFY connectionChecksChanged)
+    Q_PROPERTY(bool isCanary READ isCanary NOTIFY connectionChecksChanged)
 public:
     explicit ClientBridge(QObject *parent = nullptr);
     ~ClientBridge() override;
@@ -171,6 +172,7 @@ public:
     bool stunCheckOk() const;
     QString relayCheckText() const;
     bool relayCheckOk() const;
+    bool isCanary() const;
 
     Q_INVOKABLE void refreshAll();
     Q_INVOKABLE void refreshChatData();
@@ -262,6 +264,7 @@ private:
     bool bindCheckOk_ = false;
     bool stunCheckOk_ = false;
     bool relayCheckOk_ = false;
+    bool isCanary_ = false;
     QString pendingJoinRoomId_;
     QString pendingJoinNickname_;
     QString pendingJoinTitle_;

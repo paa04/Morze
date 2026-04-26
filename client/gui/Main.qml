@@ -1625,6 +1625,14 @@ Window {
                             color: clientBridge && clientBridge.relayCheckOk ? "#68d391" : "#ff7b7b"
                             font.pixelSize: 11
                         }
+                        Text {
+                            text: clientBridge && clientBridge.isCanary
+                                  ? "canary"
+                                  : "production"
+                            color: clientBridge && clientBridge.isCanary ? "#f6ad55" : "#68d391"
+                            font.pixelSize: 11
+                            font.bold: true
+                        }
                     }
                 }
             }
