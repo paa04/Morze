@@ -49,3 +49,4 @@ build/
 server/build/
 server/cmake-build-debug/
 
+/client/.qtcreator

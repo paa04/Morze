@@ -410,6 +410,10 @@ QString ClientBridge::selectedChatId() const {
     return selectedChatId_;
 }
 
+QString ClientBridge::selectedRoomId() const {
+    return selectedRoomId_;
+}
+
 QString ClientBridge::selectedTitle() const {
     const auto *item = chatModel_.itemAt(selectedChatIndex_);
     return item ? item->title : QString();
@@ -503,6 +507,7 @@ void ClientBridge::selectChatByIndex(int index) {
         const bool wasSelected = !selectedChatId_.isEmpty() || selectedChatIndex_ != -1;
         selectedChatIndex_ = -1;
         selectedChatId_.clear();
+        selectedRoomId_.clear();
         messageModel_.setItems({});
         if (wasSelected) {
             emit selectedChatIdChanged();
@@ -511,9 +516,12 @@ void ClientBridge::selectChatByIndex(int index) {
     }
 
     const QString newSelectedChatId = item->chatId;
-    const bool changed = (selectedChatIndex_ != index) || (selectedChatId_ != newSelectedChatId);
+    const QString newSelectedRoomId = item->roomId;
+    const bool changed = (selectedChatIndex_ != index) || (selectedChatId_ != newSelectedChatId) ||
+                         (selectedRoomId_ != newSelectedRoomId);
     selectedChatIndex_ = index;
     selectedChatId_ = newSelectedChatId;
+    selectedRoomId_ = newSelectedRoomId;
     if (changed) {
         emit selectedChatIdChanged();
     }
@@ -945,6 +953,7 @@ void ClientBridge::refreshChats() {
                 for (const auto &chat : chats) {
                     ChatListModel::Item item;
                     item.chatId = QString::fromStdString(chat.getIdAsString());
+                    item.roomId = QString::fromStdString(chat.getRoomIdAsString());
                     item.title = QString::fromStdString(chat.getTitle());
                     item.subtitle = QString::fromStdString(chat.getTypeAsString());
                     item.avatarHue = avatarHueForKey(chat.getIdAsString());
@@ -973,8 +982,11 @@ void ClientBridge::refreshChats() {
                         const auto *selected = chatModel_.itemAt(selectedChatIndex_);
                         if (selected) {
                             const QString newSelectedChatId = selected->chatId;
-                            const bool changed = (selectedChatId_ != newSelectedChatId);
+                            const QString newSelectedRoomId = selected->roomId;
+                            const bool changed = (selectedChatId_ != newSelectedChatId) ||
+                                                 (selectedRoomId_ != newSelectedRoomId);
                             selectedChatId_ = newSelectedChatId;
+                            selectedRoomId_ = newSelectedRoomId;
                             if (changed) {
                                 emit selectedChatIdChanged();
                             }

@@ -44,6 +44,7 @@ public:
 
     struct Item {
         QString chatId;
+        QString roomId;
         QString title;
         QString subtitle;
         QString lastText;
@@ -128,6 +129,7 @@ class ClientBridge final : public QObject {
     Q_PROPERTY(QAbstractItemModel *messageModel READ messageModel CONSTANT)
     Q_PROPERTY(QAbstractItemModel *participantModel READ participantModel CONSTANT)
     Q_PROPERTY(QString selectedChatId READ selectedChatId NOTIFY selectedChatIdChanged)
+    Q_PROPERTY(QString selectedRoomId READ selectedRoomId NOTIFY selectedChatIdChanged)
     Q_PROPERTY(QString selectedTitle READ selectedTitle NOTIFY selectedChatIdChanged)
     Q_PROPERTY(QString selectedSubtitle READ selectedSubtitle NOTIFY selectedChatIdChanged)
     Q_PROPERTY(QString selectedAvatarLetter READ selectedAvatarLetter NOTIFY selectedChatIdChanged)
@@ -152,6 +154,7 @@ public:
     QAbstractItemModel *participantModel();
 
     QString selectedChatId() const;
+    QString selectedRoomId() const;
     QString selectedTitle() const;
     QString selectedSubtitle() const;
     QString selectedAvatarLetter() const;
@@ -244,6 +247,7 @@ private:
     MessageListModel messageModel_;
     ParticipantListModel participantModel_;
     QString selectedChatId_;
+    QString selectedRoomId_;
     int selectedChatIndex_ = -1;
     QString netBindAddress_ = "0.0.0.0";
     QString netStunServer_ = "stun:stun.l.google.com:19302";

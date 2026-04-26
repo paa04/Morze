@@ -736,7 +736,7 @@ Window {
 
                                         Text {
                                             anchors.centerIn: parent
-                                            text: "ID: " + clientBridge.selectedChatId
+                                            text: clientBridge.selectedRoomId
                                             color: "#9db2c8"
                                             font.pixelSize: 11
                                             elide: Text.ElideRight
@@ -750,9 +750,9 @@ Window {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                if (clientBridge.selectedChatId.length === 0)
+                                                if (clientBridge.selectedRoomId.length === 0)
                                                     return
-                                                clientBridge.copyToClipboard(clientBridge.selectedChatId)
+                                                clientBridge.copyToClipboard(clientBridge.selectedRoomId)
                                                 chatIdCopyHint = "ID скопирован"
                                                 chatIdCopyHintTimer.restart()
                                             }
