@@ -26,6 +26,7 @@
 #include "MessageService.h"
 #include "MessageRepository.h"
 #include "SignalingService.h"
+#include "WebRTCService.h"
 
 class ChatListModel final : public QAbstractListModel {
     Q_OBJECT
@@ -215,6 +216,8 @@ private:
     QString resolveSignalingServerUrl() const;
     bool ensureSignalingConnected();
     void handleSignalingJoined(const QString &roomId, const QString &roomType);
+    void handleIncomingMessage(const QString &roomId, const QString &senderPeerId, const QString &text);
+    void flushPendingDirectMessages(const QString &peerId);
     QString requestStunMappedAddress(const QString &host, quint16 port, QString *error, qint64 *elapsedMs) const;
     QString extractHostFromStunValue(const QString &value) const;
     QString stripStunPrefix(const QString &value) const;
@@ -261,5 +264,10 @@ private:
     QString pendingJoinRoomType_;
     /// own peerId from signaling "joined" per roomId (for leave)
     QHash<QString, QString> myPeerIdByRoom_;
+    std::shared_ptr<WebRTCService> webRTCService_;
+    QHash<QString, QString> roomTypeByRoom_;        // roomId → "direct"/"group"
+    QHash<QString, QString> peerToRoom_;             // peerId → roomId
+    QHash<QString, QString> peerUsernames_;           // "roomId:peerId" → username
+    QHash<QString, QList<QByteArray>> pendingDirectMessages_; // peerId → queued msgs
 };
 

@@ -59,6 +59,7 @@ qt_add_executable(appMorze_ui
     ../services/services/MessageService.cpp
     ../services/services/ConnectionProfileService.cpp
     ../services/services/SignalingService.cpp
+    ../services/services/WebRTCService.cpp
 )
 
 qt_add_qml_module(appMorze_ui
@@ -89,8 +90,12 @@ set_target_properties(appMorze_ui PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
+if(NOT TARGET LibDataChannel::LibDataChannel)
+    find_package(LibDataChannel REQUIRED)
+endif()
+
 target_link_libraries(appMorze_ui
-    PRIVATE Qt6::Quick Qt6::Core Qt6::Network Qt6::QuickControls2 Qt6::WebSockets ${GUI_SQLITE_TARGET} sqlite_orm::sqlite_orm Boost::uuid Boost::asio
+    PRIVATE Qt6::Quick Qt6::Core Qt6::Network Qt6::QuickControls2 Qt6::WebSockets ${GUI_SQLITE_TARGET} sqlite_orm::sqlite_orm Boost::uuid Boost::asio LibDataChannel::LibDataChannel
 )
 
 target_include_directories(appMorze_ui PRIVATE

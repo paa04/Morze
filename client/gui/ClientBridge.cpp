@@ -235,17 +235,29 @@ ClientBridge::ClientBridge(QObject *parent)
         signalingService_ = std::make_shared<SignalingService>();
 
         connect(signalingService_.get(), &SignalingService::joined, this,
-                [this](const QString &roomId, const QString &roomType, const QString &peerId, const QJsonArray &) {
+                [this](const QString &roomId, const QString &roomType, const QString &peerId, const QJsonArray &participants) {
                     qInfo().noquote() << "[GUI] signaling joined roomId=" << roomId
                                       << " roomType=" << roomType << " peerId=" << peerId;
                     if (!roomId.isEmpty() && !peerId.isEmpty()) {
                         myPeerIdByRoom_[roomId] = peerId;
                     }
+                    roomTypeByRoom_[roomId] = roomType;
+                    // Track existing participants; initiate WebRTC for direct rooms
+                    for (const QJsonValue &v : participants) {
+                        QJsonObject obj = v.toObject();
+                        QString pid = obj["peerId"].toString();
+                        if (!pid.isEmpty() && pid != peerId) {
+                            peerToRoom_[pid] = roomId;
+                            peerUsernames_[roomId + ":" + pid] = obj["username"].toString();
+                            if (roomType == "direct" && webRTCService_)
+                                webRTCService_->initiateConnection(roomId, pid);
+                        }
+                    }
                     handleSignalingJoined(roomId, roomType);
                 });
         connect(signalingService_.get(), &SignalingService::connected, this, [this]() {
             qInfo().noquote() << "[GUI] signaling connected";
-            if (!pendingJoinRoomId_.isEmpty() && !pendingJoinNickname_.isEmpty() && !pendingJoinRoomType_.isEmpty()) {
+            if (!pendingJoinRoomId_.isEmpty() && !pendingJoinNickname_.isEmpty()) {
                 qInfo().noquote() << "[GUI] replay pending join roomId=" << pendingJoinRoomId_
                                   << " roomType=" << pendingJoinRoomType_;
                 signalingService_->join(pendingJoinRoomId_, pendingJoinNickname_, pendingJoinRoomType_);
@@ -275,8 +287,100 @@ ClientBridge::ClientBridge(QObject *parent)
         loadChatNicknames();
         loadStunServersFromConfig();
         loadDefaultNetworkState();
+
+        // --- WebRTC for direct rooms ---
+        {
+            std::vector<std::string> stunForWebRtc;
+            for (const QString &s : stunServerOptions_)
+                stunForWebRtc.push_back(ensureStunPrefix(s).toStdString());
+            if (stunForWebRtc.empty())
+                stunForWebRtc.push_back("stun:stun.l.google.com:19302");
+            webRTCService_ = std::make_shared<WebRTCService>(stunForWebRtc);
+        }
+
+        // Signaling → WebRTC
+        connect(signalingService_.get(), &SignalingService::offerReceived,
+                webRTCService_.get(), &WebRTCService::onOfferReceived);
+        connect(signalingService_.get(), &SignalingService::answerReceived,
+                webRTCService_.get(), &WebRTCService::onAnswerReceived);
+        connect(signalingService_.get(), &SignalingService::iceCandidateReceived,
+                webRTCService_.get(), &WebRTCService::onIceCandidateReceived);
+
+        // WebRTC → Signaling
+        connect(webRTCService_.get(), &WebRTCService::sendOffer, this,
+                [this](const QString &roomId, const QString &peerId, const QJsonObject &sdp) {
+                    signalingService_->offer(roomId, peerId, sdp);
+                });
+        connect(webRTCService_.get(), &WebRTCService::sendAnswer, this,
+                [this](const QString &roomId, const QString &peerId, const QJsonObject &sdp) {
+                    signalingService_->answer(roomId, peerId, sdp);
+                });
+        connect(webRTCService_.get(), &WebRTCService::sendIceCandidate, this,
+                [this](const QString &roomId, const QString &peerId, const QJsonObject &candidate) {
+                    signalingService_->iceCandidate(roomId, peerId, candidate);
+                });
+
+        // WebRTC incoming P2P message
+        connect(webRTCService_.get(), &WebRTCService::messageReceived, this,
+                [this](const QString &peerId, const QByteArray &data) {
+                    auto it = peerToRoom_.find(peerId);
+                    if (it != peerToRoom_.end())
+                        handleIncomingMessage(*it, peerId, QString::fromUtf8(data));
+                });
+
+        // DataChannel opened → flush queued direct messages
+        connect(webRTCService_.get(), &WebRTCService::connectionOpened, this,
+                [this](const QString &peerId) {
+                    qInfo().noquote() << "[GUI] WebRTC DataChannel open:" << peerId;
+                    flushPendingDirectMessages(peerId);
+                });
+
+        // Peer joined → track + initiate WebRTC for direct rooms
+        connect(signalingService_.get(), &SignalingService::peerJoined, this,
+                [this](const QString &roomId, const QString &peerId, const QString &username) {
+                    peerToRoom_[peerId] = roomId;
+                    peerUsernames_[roomId + ":" + peerId] = username;
+                    if (roomTypeByRoom_.value(roomId) == "direct" && webRTCService_)
+                        webRTCService_->initiateConnection(roomId, peerId);
+                });
+
+        // Peer left → cleanup WebRTC
+        connect(signalingService_.get(), &SignalingService::peerLeft, this,
+                [this](const QString &roomId, const QString &peerId) {
+                    peerToRoom_.remove(peerId);
+                    if (webRTCService_)
+                        webRTCService_->closeConnection(peerId);
+                });
+
+        // Group messages (relay through signaling server)
+        connect(signalingService_.get(), &SignalingService::groupMessageReceived, this,
+                [this](const QString &roomId, const QString &fromPeerId, qint64 seq, const QJsonObject &payload) {
+                    // Skip own echoed messages
+                    if (fromPeerId == myPeerIdByRoom_.value(roomId))
+                        return;
+                    handleIncomingMessage(roomId, fromPeerId, payload["text"].toString());
+                    signalingService_->ack(roomId, seq);
+                });
+
+        // Buffered messages on reconnect
+        connect(signalingService_.get(), &SignalingService::bufferedMessagesReceived, this,
+                [this](const QString &roomId, const QJsonArray &messages) {
+                    for (const QJsonValue &v : messages) {
+                        QJsonObject obj = v.toObject();
+                        QString fromPeerId = obj["fromPeerId"].toString();
+                        if (fromPeerId == myPeerIdByRoom_.value(roomId))
+                            continue;
+                        handleIncomingMessage(roomId, fromPeerId,
+                                              obj["payload"].toObject()["text"].toString());
+                        signalingService_->ack(roomId, obj["messageSeq"].toInteger());
+                    }
+                });
+
         workGuard_.emplace(ioc_.get_executor());
         ioThread_ = std::thread([this]() { ioc_.run(); });
+
+        // Auto-connect to signaling server on startup
+        ensureSignalingConnected();
     } catch (const std::exception &e) {
         emit errorOccurred(QString::fromUtf8(e.what()));
     }
@@ -457,11 +561,28 @@ void ClientBridge::sendMessage(const QString &text) {
                 QMetaObject::invokeMethod(
                     this,
                     [this, roomIdForServer, textCopy]() {
-                        if (signalingService_ && signalingService_->isConnected()) {
-                            QJsonObject payload;
-                            payload["text"] = textCopy;
-                            payload["kind"] = "chat";
-                            signalingService_->groupMessage(roomIdForServer, payload);
+                        const QString roomType = roomTypeByRoom_.value(roomIdForServer, "group");
+                        if (roomType == "direct") {
+                            // Send via WebRTC P2P
+                            const QString myPeerId = myPeerIdByRoom_.value(roomIdForServer);
+                            QByteArray data = textCopy.toUtf8();
+                            for (auto it = peerToRoom_.cbegin(); it != peerToRoom_.cend(); ++it) {
+                                if (it.value() == roomIdForServer && it.key() != myPeerId) {
+                                    if (webRTCService_ && webRTCService_->isDataChannelOpen(it.key())) {
+                                        webRTCService_->sendMessage(it.key(), data);
+                                    } else {
+                                        pendingDirectMessages_[it.key()].append(data);
+                                    }
+                                }
+                            }
+                        } else {
+                            // Send via signaling relay (group message)
+                            if (signalingService_ && signalingService_->isConnected()) {
+                                QJsonObject payload;
+                                payload["text"] = textCopy;
+                                payload["kind"] = "chat";
+                                signalingService_->groupMessage(roomIdForServer, payload);
+                            }
                         }
                         refreshMessages();
                         refreshParticipants();
@@ -654,10 +775,9 @@ bool ClientBridge::joinChatById(const QString &chatOrRoomId, const QString &nick
     pendingJoinRoomId_ = normalizedId;
     pendingJoinNickname_ = normalizedNick;
     pendingJoinTitle_.clear();
-    pendingJoinRoomType_ = "direct";
+    pendingJoinRoomType_.clear(); // let server determine type from existing room
     if (signalingService_->isConnected()) {
         qInfo().noquote() << "[GUI] join chat roomId=" << pendingJoinRoomId_
-                          << " roomType=" << pendingJoinRoomType_
                           << " nickname=" << pendingJoinNickname_;
         signalingService_->join(pendingJoinRoomId_, pendingJoinNickname_, pendingJoinRoomType_);
     }
@@ -1450,5 +1570,72 @@ void ClientBridge::setRelayCheckResult(bool ok, const QString &text) {
     relayCheckOk_ = ok;
     relayCheckText_ = text;
     emit connectionChecksChanged();
+}
+
+void ClientBridge::handleIncomingMessage(const QString &roomId, const QString &senderPeerId, const QString &text) {
+    if (text.isEmpty()) return;
+
+    boost::asio::co_spawn(
+        ioc_,
+        [this, roomId, senderPeerId, text]() -> boost::asio::awaitable<void> {
+            try {
+                boost::uuids::string_generator parser;
+                const auto roomUuid = parser(roomId.toStdString());
+                const auto chats = co_await chatService_->getAllChats();
+                auto chatIt = std::find_if(chats.begin(), chats.end(), [&](const ChatModel &c) {
+                    return c.getRoomId() == roomUuid;
+                });
+                if (chatIt == chats.end()) co_return;
+
+                // Find or create member for sender
+                const auto members = co_await memberService_->getMembersByChatId(chatIt->getId());
+                boost::uuids::uuid senderMemberId;
+                bool found = false;
+
+                // Try to match by username from peerUsernames_
+                const QString key = roomId + ":" + senderPeerId;
+                const QString peerName = peerUsernames_.value(key, senderPeerId);
+                for (const auto &m : members) {
+                    if (m.getUsername() == peerName.toStdString()) {
+                        senderMemberId = m.getId();
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    ChatMemberModel peerMember(peerName.toStdString(), std::chrono::system_clock::now());
+                    co_await memberService_->addMember(peerMember);
+                    try { co_await chatService_->addMemberToChat(chatIt->getId(), peerMember.getId()); } catch (...) {}
+                    senderMemberId = peerMember.getId();
+                }
+
+                MessageModel message(
+                    chatIt->getId(), senderMemberId,
+                    MessageDirection::Incoming, text.toStdString(),
+                    std::chrono::system_clock::now(), DeliveryState::Delivered);
+                co_await messageService_->addMessage(message);
+
+                QMetaObject::invokeMethod(this, [this]() {
+                    refreshMessages();
+                    refreshChats();
+                }, Qt::QueuedConnection);
+            } catch (const std::exception &e) {
+                QMetaObject::invokeMethod(this, [this, msg = QString::fromUtf8(e.what())]() {
+                    emit errorOccurred(msg);
+                }, Qt::QueuedConnection);
+            }
+        },
+        boost::asio::detached);
+}
+
+void ClientBridge::flushPendingDirectMessages(const QString &peerId) {
+    auto it = pendingDirectMessages_.find(peerId);
+    if (it == pendingDirectMessages_.end() || it->isEmpty()) return;
+    if (!webRTCService_ || !webRTCService_->isDataChannelOpen(peerId)) return;
+
+    for (const auto &data : *it)
+        webRTCService_->sendMessage(peerId, data);
+    it->clear();
 }
 
