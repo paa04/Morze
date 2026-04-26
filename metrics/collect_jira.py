@@ -72,7 +72,7 @@ def fetch_all_issues():
     issues = []
     start = 0
     while True:
-        data = jira_get("/rest/api/3/search", {
+        data = jira_get("/rest/api/2/search", {
             "jql": f"project={PROJECT} ORDER BY created ASC",
             "startAt": start,
             "maxResults": 100,
