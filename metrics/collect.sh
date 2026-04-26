@@ -126,4 +126,8 @@ json.dump(result, open('$OUT_DIR/hot_files.json','w'), indent=2)
 print(f'  hot_files.json: {len(result)} files')
 "
 
+# 8. JIRA Lead Time (requires JIRA_BASE_URL, JIRA_USER_EMAIL, JIRA_API_TOKEN)
+echo "Collecting JIRA metrics..."
+python3 "$SCRIPT_DIR/collect_jira.py"
+
 echo "Done! Files in $OUT_DIR/"
