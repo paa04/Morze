@@ -26,7 +26,7 @@ EXPOSE 9001
 
 # Healthcheck для Railway
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD nc -z localhost 9001 || exit 1
+    CMD nc -z localhost ${PORT:-9001} || exit 1
 
 # Запуск сервера
 CMD ["./build/signaling_server"]
