@@ -2,8 +2,9 @@
 
 #include "application/protocol.hpp"
 
+#include "infrastructure/logger.hpp"
+
 #include <boost/json.hpp>
-#include <iostream>
 
 namespace signaling::application
 {
@@ -52,9 +53,10 @@ namespace signaling::application
                 session->sendText(toText(protocol::makeError(
                     std::string("internal error: ") + ex.what())));
             } catch (...) {}
-            std::cerr << "[ERROR] handleMessage exception: " << ex.what() << "\n";
+            infrastructure::log(infrastructure::LogLevel::ERROR,
+                std::string("handleMessage exception: ") + ex.what());
         } catch (...) {
-            std::cerr << "[ERROR] handleMessage unknown exception\n";
+            infrastructure::log(infrastructure::LogLevel::ERROR, "handleMessage unknown exception");
         }
     }
 
@@ -281,9 +283,10 @@ namespace signaling::application
                 }
             }
         } catch (const std::exception &ex) {
-            std::cerr << "[ERROR] handleDisconnect exception: " << ex.what() << "\n";
+            infrastructure::log(infrastructure::LogLevel::ERROR,
+                std::string("handleDisconnect exception: ") + ex.what());
         } catch (...) {
-            std::cerr << "[ERROR] handleDisconnect unknown exception\n";
+            infrastructure::log(infrastructure::LogLevel::ERROR, "handleDisconnect unknown exception");
         }
     }
 

@@ -7,9 +7,10 @@
 
 #include <boost/asio.hpp>
 
+#include "infrastructure/logger.hpp"
+
 #include <algorithm>
 #include <atomic>
-#include <iostream>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -81,12 +82,14 @@ namespace signaling
             impl_->listener->run();
         } catch (const std::exception &ex)
         {
-            std::cerr << "Failed to start signaling server: " << ex.what() << '\n';
+            infrastructure::log(infrastructure::LogLevel::ERROR,
+                std::string("Failed to start signaling server: ") + ex.what());
             impl_->started.store(false);
             return false;
         }
 
-        std::cout << "Signaling server started on ws://0.0.0.0:" << impl_->port << '\n';
+        infrastructure::log(infrastructure::LogLevel::INFO,
+            "Signaling server started on ws://0.0.0.0:" + std::to_string(impl_->port));
         return true;
     }
 

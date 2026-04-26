@@ -1,0 +1,14 @@
+services:
+  server:
+    build: .
+    ports:
+      - "9001:9001"
+    environment:
+      - PORT=9001
+      - THREADS=1
+      - DB_PATH=/data/morze.db
+    volumes:
+      - server-data:/data
+
+volumes:
+  server-data:
