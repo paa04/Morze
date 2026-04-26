@@ -42,6 +42,8 @@
 
 <div class="full card"><h2>Commits per Week per Author</h2><canvas id="weeklyChart"></canvas></div>
 
+<div class="full card"><h2>Lead Time by Status (JIRA)</h2><canvas id="leadTimeChart"></canvas></div>
+
 <div class="grid2">
   <div class="card"><h2>Pull Requests Merged</h2><table id="prTable"><thead><tr><th>PR</th><th>Branch</th><th>Merged</th></tr></thead><tbody></tbody></table></div>
   <div class="card"><h2>Hot Files (Most Changed)</h2><canvas id="hotChart"></canvas></div>
@@ -55,11 +57,15 @@ async function load(name) {
   return r.json();
 }
 
+async function loadSafe(name) {
+  try { return await load(name); } catch(e) { return []; }
+}
+
 async function init() {
-  const [summary, daily, authors, loc, prs, hot, weekly] = await Promise.all([
+  const [summary, daily, authors, loc, prs, hot, weekly, leadTime] = await Promise.all([
     load('summary.json'), load('commits_daily.json'), load('commits_by_author.json'),
     load('loc_by_author.json'), load('pull_requests.json'), load('hot_files.json'),
-    load('commits_weekly.json')
+    load('commits_weekly.json'), loadSafe('lead_time.json')
   ]);
   const s = summary[0];
 
@@ -117,6 +123,44 @@ async function init() {
     }))},
     options:{scales:{x:{stacked:true,ticks:{color:'#888'}},y:{stacked:true,ticks:{color:'#888'}}},plugins:{legend:{labels:{color:'#ccc'}}}}
   });
+
+  // Lead Time (JIRA)
+  if (leadTime && leadTime.length > 0) {
+    const ltStatuses = [
+      {key:'В работе',                   color:'#34d399'},
+      {key:'Ревью',                      color:'#fbbf24'},
+      {key:'Подготовка к тестированию',   color:'#60a5fa'},
+      {key:'На проверку',                color:'#fb923c'},
+      {key:'Тестируется',                color:'#f87171'},
+      {key:'Ожидает приемку',            color:'#e879f9'},
+      {key:'Приемка на платформе',       color:'#a78bfa'},
+      {key:'Готово',                     color:'#94a3b8'},
+      {key:'Требуется выгрузка',         color:'#4ade80'},
+    ];
+    const ltMonths = leadTime.map(e => e.month);
+    new Chart(document.getElementById('leadTimeChart'), {
+      type: 'bar',
+      data: {
+        labels: ltMonths,
+        datasets: ltStatuses.map(s => ({
+          label: s.key,
+          data: leadTime.map(e => (e.statuses && e.statuses[s.key]) || 0),
+          backgroundColor: s.color,
+        }))
+      },
+      options: {
+        indexAxis: 'y',
+        scales: {
+          x: { stacked: true, title: { display: true, text: 'Days', color: '#888' }, ticks: { color: '#888' } },
+          y: { stacked: true, ticks: { color: '#888' } }
+        },
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#ccc', boxWidth: 14, padding: 10 } },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw.toFixed(1) + ' d' } }
+        }
+      }
+    });
+  }
 
   // PR table
   const tbody = document.querySelector('#prTable tbody');

@@ -23,6 +23,10 @@ jobs:
           fetch-depth: 0
 
       - name: Collect metrics
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
         run: bash metrics/collect.sh
 
       - name: Build dashboard

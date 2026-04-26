@@ -11,7 +11,7 @@ import json, os
 
 data_dir = '$SCRIPT_DIR/data'
 files = ['summary','commits_daily','commits_by_author','loc_by_author',
-         'pull_requests','hot_files','commits_weekly']
+         'pull_requests','hot_files','commits_weekly','lead_time']
 
 embedded = {}
 for f in files:
@@ -22,16 +22,25 @@ with open('$SCRIPT_DIR/dashboard.html') as fp:
     html = fp.read()
 
 # Заменяем fetch-вызовы на встроенные данные
-inject = 'const EMBEDDED = ' + json.dumps(embedded) + ';\\n'
+inject = 'const EMBEDDED = ' + json.dumps(embedded, ensure_ascii=False) + ';\\n'
 inject += '''async function load(name) {
   const key = name.replace('.json','');
   return EMBEDDED[key];
+}
+
+async function loadSafe(name) {
+  const key = name.replace('.json','');
+  return EMBEDDED[key] || [];
 }'''
 
 html = html.replace(
     '''async function load(name) {
   const r = await fetch('data/' + name);
   return r.json();
+}
+
+async function loadSafe(name) {
+  try { return await load(name); } catch(e) { return []; }
 }''', inject)
 
 out = '$SCRIPT_DIR/team_speed_report.html'
