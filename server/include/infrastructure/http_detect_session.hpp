@@ -14,7 +14,8 @@ class HttpDetectSession : public std::enable_shared_from_this<HttpDetectSession>
 public:
     HttpDetectSession(boost::asio::ip::tcp::socket socket,
                       std::shared_ptr<application::MessageHandler> handler,
-                      int canaryPercent);
+                      int canaryPercent,
+                      bool canaryActive);
 
     void run();
 
@@ -25,6 +26,7 @@ private:
     boost::asio::ip::tcp::socket socket_;
     std::shared_ptr<application::MessageHandler> handler_;
     int canaryPercent_;
+    bool canaryActive_;
     boost::beast::flat_buffer buffer_;
     boost::beast::http::request<boost::beast::http::string_body> req_;
 };

@@ -118,6 +118,11 @@ if (WIN32)
     target_link_libraries(appMorze_ui PRIVATE dwmapi ws2_32)
 endif()
 
+add_custom_command(TARGET appMorze_ui POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_CURRENT_SOURCE_DIR}/../config.json
+    $<TARGET_FILE_DIR:appMorze_ui>/config.json)
+
 install(TARGETS appMorze_ui
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

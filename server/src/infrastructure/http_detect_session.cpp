@@ -18,10 +18,12 @@ using tcp = asio::ip::tcp;
 
 HttpDetectSession::HttpDetectSession(tcp::socket socket,
                                      std::shared_ptr<application::MessageHandler> handler,
-                                     int canaryPercent)
+                                     int canaryPercent,
+                                     bool canaryActive)
     : socket_(std::move(socket))
     , handler_(std::move(handler))
     , canaryPercent_(canaryPercent)
+    , canaryActive_(canaryActive)
 {}
 
 void HttpDetectSession::run()
@@ -38,6 +40,26 @@ void HttpDetectSession::onRead(beast::error_code ec, std::size_t)
     if (websocket::is_upgrade(req_)) {
         auto ws = std::make_shared<WsSession>(std::move(socket_), handler_);
         ws->run(std::move(req_), std::move(buffer_));
+        return;
+    }
+
+    // GET /canary/status → kill switch for canary rollback
+    if (req_.method() == http::verb::get && req_.target() == "/canary/status") {
+        boost::json::object body;
+        body["active"] = canaryActive_;
+
+        http::response<http::string_body> res{http::status::ok, req_.version()};
+        res.set(http::field::server, "MorzeSignaling/1.0");
+        res.set(http::field::content_type, "application/json");
+        res.keep_alive(false);
+        res.body() = boost::json::serialize(body);
+        res.prepare_payload();
+
+        auto sp = std::make_shared<http::response<http::string_body>>(std::move(res));
+        http::async_write(socket_, *sp,
+            [self = shared_from_this(), sp](beast::error_code ec, std::size_t) {
+                self->socket_.shutdown(tcp::socket::shutdown_send, ec);
+            });
         return;
     }
 

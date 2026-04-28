@@ -1306,11 +1306,29 @@ bool ClientBridge::ensureSignalingConnected() {
         return false;
     }
 
-    // Canary check: ask production server if this session should use canary
+    // Canary check: use sticky flag if present, but verify via kill switch first
     const QString canaryUrl = readCanaryServerUrlFromConfigFile();
-    if (!canaryUrl.isEmpty() && checkCanary(serverUrl)) {
-        qInfo().noquote() << "[GUI] canary flag received, switching to canary server";
-        isCanary_ = true;
+    if (!canaryUrl.isEmpty()) {
+        QSettings settings("Morze", "MorzeGUI");
+        if (settings.contains("canary/sticky")) {
+            // Have sticky flag — check kill switch before trusting it
+            if (!checkCanaryActive(serverUrl)) {
+                qInfo().noquote() << "[GUI] canary killed by server, resetting sticky flag";
+                settings.remove("canary/sticky");
+                isCanary_ = false;
+            } else {
+                isCanary_ = settings.value("canary/sticky").toBool();
+                qInfo().noquote() << "[GUI] sticky canary flag:" << (isCanary_ ? "CANARY" : "production");
+            }
+        } else {
+            // No sticky flag — ask server for initial assignment
+            isCanary_ = checkCanary(serverUrl);
+            settings.setValue("canary/sticky", isCanary_);
+            qInfo().noquote() << "[GUI] canary flag resolved and persisted:" << (isCanary_ ? "CANARY" : "production");
+        }
+        if (isCanary_) {
+            serverUrl = canaryUrl;
+        }
     } else {
         isCanary_ = false;
     }

@@ -17,8 +17,9 @@ namespace signaling::infrastructure {
     Listener::Listener(asio::io_context &ioc,
                        tcp::endpoint endpoint,
                        std::shared_ptr<application::MessageHandler> handler,
-                       int canaryPercent)
-            : ioc_(ioc), acceptor_(ioc), handler_(std::move(handler)), canaryPercent_(canaryPercent) {
+                       int canaryPercent,
+                       bool canaryActive)
+            : ioc_(ioc), acceptor_(ioc), handler_(std::move(handler)), canaryPercent_(canaryPercent), canaryActive_(canaryActive) {
         beast::error_code ec;
 
         acceptor_.open(endpoint.protocol(), ec);
@@ -58,7 +59,7 @@ namespace signaling::infrastructure {
         }
 
         if (!ec) {
-            std::make_shared<HttpDetectSession>(std::move(socket), handler_, canaryPercent_)->run();
+            std::make_shared<HttpDetectSession>(std::move(socket), handler_, canaryPercent_, canaryActive_)->run();
         }
 
         doAccept();

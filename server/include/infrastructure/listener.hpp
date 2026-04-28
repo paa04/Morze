@@ -15,7 +15,8 @@ namespace signaling::infrastructure {
         Listener(boost::asio::io_context &ioc,
                  boost::asio::ip::tcp::endpoint endpoint,
                  std::shared_ptr<application::MessageHandler> handler,
-                 int canaryPercent = 50);
+                 int canaryPercent = 50,
+                 bool canaryActive = true);
 
         void run();
 
@@ -28,6 +29,7 @@ namespace signaling::infrastructure {
         boost::asio::ip::tcp::acceptor acceptor_;
         std::shared_ptr<application::MessageHandler> handler_;
         int canaryPercent_;
+        bool canaryActive_;
     };
 
 } // namespace signaling::infrastructure

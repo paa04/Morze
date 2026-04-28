@@ -9,7 +9,8 @@ namespace signaling {
     class SignalingServer {
     public:
         explicit SignalingServer(uint16_t port, std::size_t threads = 1,
-                                std::string dbPath = "", int canaryPercent = 50);
+                                std::string dbPath = "", int canaryPercent = 50,
+                                bool canaryActive = true);
 
         ~SignalingServer();
 

@@ -555,7 +555,7 @@ Window {
                                 TextInput {
                                     id: messageInput
                                     anchors.left: parent.left
-                                    anchors.right: parent.right
+                                    anchors.right: charCounter.visible ? charCounter.left : parent.right
                                     anchors.verticalCenter: parent.verticalCenter
                                     anchors.leftMargin: 12
                                     anchors.rightMargin: 12
@@ -568,6 +568,16 @@ Window {
                                         clientBridge.sendMessage(text)
                                         clear()
                                     }
+                                }
+                                Text {
+                                    id: charCounter
+                                    visible: clientBridge && clientBridge.isCanary
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 8
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: messageInput.text.length.toString()
+                                    color: "#6b7b8d"
+                                    font.pixelSize: 11
                                 }
                             }
                             Rectangle {

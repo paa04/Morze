@@ -7,7 +7,7 @@
     "file": "logs/morze.log"
   },
   "signaling": {
-    "server_url": "wss://morze-production.up.railway.app",
+    "server_url": "ws://localhost:9001",
     "canary_server_url": "wss://extraordinary-strength-production-68ad.up.railway.app",
     "stun_url": "stun:stun.l.google.com:19302",
     "stun_urls": [
