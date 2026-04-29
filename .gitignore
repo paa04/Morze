@@ -39,3 +39,14 @@
 
 # debug information files
 *.dwo
+
+*/cmake-buid-debug/
+*/.idea/
+*.bkp
+*.db
+.vscode
+build/
+server/build/
+server/cmake-build-debug/
+
+/client/.qtcreator

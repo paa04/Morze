@@ -1,0 +1,17 @@
+{
+  "database": {
+    "path": "chat.db"
+  },
+  "logging": {
+    "level": "info",
+    "file": "logs/morze.log"
+  },
+  "signaling": {
+    "server_url": "wss://morze-production.up.railway.app",
+    "stun_url": "stun:stun.l.google.com:19302",
+    "stun_urls": [
+      "stun:stun.l.google.com:19302",
+      "stun:global.stun.twilio.com:3478"
+    ]
+  }
+}

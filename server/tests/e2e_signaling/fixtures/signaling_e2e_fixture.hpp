@@ -1,0 +1,28 @@
+#pragma once
+
+#include "signaling_server.hpp"
+
+#include <gtest/gtest.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <thread>
+#include <atomic>
+
+class TestFixture : public ::testing::Test {
+protected:
+
+    uint16_t port;
+    size_t threads = 1;
+
+    static std::atomic<uint16_t> next_port;
+
+    std::unique_ptr<signaling::SignalingServer> server_ptr;
+    std::thread server_thrd;
+
+    void SetUp() override;
+
+    void TearDown() override;
+};

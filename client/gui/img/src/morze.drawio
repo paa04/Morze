@@ -1,0 +1,28 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 YaBrowser/26.3.0.0 Safari/537.36" version="29.2.9">
+  <diagram name="Алгоритм модуля ядра" id="WEoKC9HdeAFRy_Q2NMSj">
+    <mxGraphModel dx="126" dy="127" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="zaJI8OOiYyy6dq3XoU9p-1" parent="1" style="whiteSpace=wrap;html=1;shape=mxgraph.basic.oval_callout;strokeColor=default;fillColor=#1E3248;flipV=0;flipH=1;" value="" vertex="1">
+          <mxGeometry height="80" width="120" x="80" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="zaJI8OOiYyy6dq3XoU9p-8" connectable="0" parent="1" style="group" value="" vertex="1">
+          <mxGeometry height="10" width="85" x="100" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="zaJI8OOiYyy6dq3XoU9p-3" parent="zaJI8OOiYyy6dq3XoU9p-8" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#8FCFFF;" value="" vertex="1">
+          <mxGeometry height="10" width="25" as="geometry" />
+        </mxCell>
+        <mxCell id="zaJI8OOiYyy6dq3XoU9p-4" parent="zaJI8OOiYyy6dq3XoU9p-8" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeColor=none;fillColor=#8FCFFF;" value="" vertex="1">
+          <mxGeometry height="10" width="10" x="61" as="geometry" />
+        </mxCell>
+        <mxCell id="zaJI8OOiYyy6dq3XoU9p-5" parent="zaJI8OOiYyy6dq3XoU9p-8" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeColor=none;fillColor=#8FCFFF;" value="" vertex="1">
+          <mxGeometry height="10" width="10" x="75" as="geometry" />
+        </mxCell>
+        <mxCell id="zaJI8OOiYyy6dq3XoU9p-7" parent="zaJI8OOiYyy6dq3XoU9p-8" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#8FCFFF;" value="" vertex="1">
+          <mxGeometry height="10" width="25" x="31" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
